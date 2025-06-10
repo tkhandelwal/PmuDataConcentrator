@@ -202,9 +202,22 @@ export class PmuStatusCardComponent {
   }
 
   getVoltage(): number {
-    const voltagePhasor = this.pmuData.phasors?.find((p: any) => p.type === 0);
-    return voltagePhasor ? voltagePhasor.magnitude / 1000 : 0;
+  if (!this.pmuData.phasors || this.pmuData.phasors.length === 0) {
+    return 0;
   }
+  
+  const voltagePhasor = this.pmuData.phasors.find((p: any) => 
+    (p.type === 0 || p.Type === 0) && 
+    (p.name === 'VA' || p.Name === 'VA' || p.name === 'V1' || p.Name === 'V1')
+  );
+  
+  if (voltagePhasor) {
+    const magnitude = voltagePhasor.magnitude ?? voltagePhasor.Magnitude ?? 0;
+    return magnitude / 1000;
+  }
+  
+  return 0;
+}
 
   getHealthScore(): number {
     let score = 100;

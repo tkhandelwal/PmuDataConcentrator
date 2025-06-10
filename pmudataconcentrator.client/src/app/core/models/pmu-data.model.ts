@@ -1,7 +1,7 @@
 export interface PmuData {
   id: string;
   pmuId: number;
-  timestamp: Date;
+  timestamp: Date | string;
   socTimestamp: number;
   fracSec: number;
   phasors: Phasor[];
@@ -12,6 +12,10 @@ export interface PmuData {
   latitude: number;
   longitude: number;
   stationName: string;
+  // Also handle PascalCase from backend (during transition)
+  Latitude?: number;
+  Longitude?: number;
+  StationName?: string;
 }
 
 export interface Phasor {
@@ -20,6 +24,12 @@ export interface Phasor {
   value: { real: number; imaginary: number };
   magnitude: number;
   angle: number;
+  // Handle both cases
+  Name?: string;
+  Type?: PhasorType;
+  Value?: { Real: number; Imaginary: number };
+  Magnitude?: number;
+  Angle?: number;
 }
 
 export enum PhasorType {

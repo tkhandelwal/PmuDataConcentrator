@@ -1,6 +1,8 @@
 import { Component, Input, OnInit, OnChanges, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Chart, ChartConfiguration, ChartType, registerables } from 'chart.js';
+import 'chartjs-adapter-date-fns';
+import { enUS } from 'date-fns/locale';
 
 Chart.register(...registerables);
 
@@ -92,7 +94,7 @@ export class FrequencyChartComponent implements OnInit, AfterViewInit, OnChanges
             padding: 12,
             displayColors: true,
             callbacks: {
-              label: (context) => {
+              label: (context: any) => {
                 return `${context.dataset.label}: ${context.parsed.y.toFixed(3)} Hz`;
               }
             }
@@ -103,7 +105,14 @@ export class FrequencyChartComponent implements OnInit, AfterViewInit, OnChanges
             type: 'time',
             time: {
               displayFormats: {
-                second: 'HH:mm:ss'
+                second: 'HH:mm:ss',
+                minute: 'HH:mm'
+              },
+              tooltipFormat: 'PPpp'
+            },
+            adapters: {
+              date: {
+                locale: enUS
               }
             },
             grid: {
@@ -130,7 +139,7 @@ export class FrequencyChartComponent implements OnInit, AfterViewInit, OnChanges
               font: {
                 size: 11
               },
-              callback: (value) => `${value} Hz`
+              callback: (value: any) => `${value} Hz`
             }
           }
         }
@@ -150,33 +159,38 @@ export class FrequencyChartComponent implements OnInit, AfterViewInit, OnChanges
       }
 
       const buffer = this.dataBuffer.get(pmu.pmuId)!;
-      buffer.times.push(new Date(pmu.timestamp));
-      buffer.values.push(pmu.frequency);
+      const timestamp = new Date(pmu.timestamp);
+      
+      // Ensure valid date
+      if (!isNaN(timestamp.getTime())) {
+        buffer.times.push(timestamp);
+        buffer.values.push(pmu.frequency);
 
-      // Keep only recent data
-      if (buffer.times.length > this.maxDataPoints) {
-        buffer.times.shift();
-        buffer.values.shift();
+        // Keep only recent data
+        if (buffer.times.length > this.maxDataPoints) {
+          buffer.times.shift();
+          buffer.values.shift();
+        }
       }
     });
 
     // Update chart datasets - show only average for cleaner view
     const avgData = this.calculateAverageFrequency();
     
-    this.chart.data.datasets = [{
-      label: 'System Average',
-      data: avgData,
-      borderColor: '#00d4ff',
-      backgroundColor: 'rgba(0, 212, 255, 0.1)',
-      borderWidth: 2,
-      pointRadius: 0,
-      tension: 0.1,
-      fill: true
-    }];
+    if (avgData.length > 0) {
+      this.chart.data.datasets = [{
+        label: 'System Average',
+        data: avgData,
+        borderColor: '#00d4ff',
+        backgroundColor: 'rgba(0, 212, 255, 0.1)',
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0.1,
+        fill: true
+      }];
 
-    // Add reference lines as datasets
-    const timeRange = avgData.map(d => d.x);
-    if (timeRange.length > 0) {
+      // Add reference lines as datasets
+      const timeRange = avgData.map(d => d.x);
       this.chart.data.datasets.push({
         label: 'Nominal (60 Hz)',
         data: timeRange.map(time => ({ x: time, y: 60 })),
@@ -186,9 +200,9 @@ export class FrequencyChartComponent implements OnInit, AfterViewInit, OnChanges
         pointRadius: 0,
         fill: false
       });
-    }
 
-    this.chart.update('none');
+      this.chart.update('none');
+    }
   }
 
   private calculateAverageFrequency(): any[] {
@@ -197,10 +211,12 @@ export class FrequencyChartComponent implements OnInit, AfterViewInit, OnChanges
     this.dataBuffer.forEach(buffer => {
       buffer.times.forEach((time, i) => {
         const timestamp = time.getTime();
-        if (!timeMap.has(timestamp)) {
-          timeMap.set(timestamp, []);
+        if (!isNaN(timestamp) && isFinite(timestamp)) {
+          if (!timeMap.has(timestamp)) {
+            timeMap.set(timestamp, []);
+          }
+          timeMap.get(timestamp)!.push(buffer.values[i]);
         }
-        timeMap.get(timestamp)!.push(buffer.values[i]);
       });
     });
 
@@ -209,6 +225,7 @@ export class FrequencyChartComponent implements OnInit, AfterViewInit, OnChanges
         x: new Date(timestamp),
         y: values.reduce((a, b) => a + b, 0) / values.length
       }))
+      .filter(point => !isNaN(point.x.getTime()) && !isNaN(point.y))
       .sort((a, b) => a.x.getTime() - b.x.getTime());
   }
 }

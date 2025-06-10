@@ -1,11 +1,12 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
+import { MatButtonModule } from '@angular/material/button';
 
 @Component({
   selector: 'app-event-log',
   standalone: true,
-  imports: [CommonModule, MatIconModule],
+  imports: [CommonModule, MatIconModule, MatButtonModule],
   template: `
     <div class="event-log">
       <div *ngIf="events.length === 0" class="no-events">
@@ -15,7 +16,10 @@ import { MatIconModule } from '@angular/material/icon';
       </div>
       
       <div *ngIf="events.length > 0" class="event-list">
-        <div *ngFor="let event of events" class="event-item" [class.critical]="event.severity === 2">
+        <div *ngFor="let event of events" 
+             class="event-item" 
+             [class.critical]="event.severity === 2"
+             [class.acknowledged]="event.isAcknowledged">
           <div class="event-icon">
             <mat-icon [style.color]="getEventColor(event)">
               {{ getEventIcon(event) }}
@@ -28,6 +32,12 @@ import { MatIconModule } from '@angular/material/icon';
               <span>{{ formatTime(event.timestamp) }}</span>
             </div>
           </div>
+          <button mat-icon-button 
+                  *ngIf="!event.isAcknowledged"
+                  (click)="acknowledgeEvent(event.id)"
+                  matTooltip="Acknowledge">
+            <mat-icon>done</mat-icon>
+          </button>
         </div>
       </div>
     </div>
@@ -36,6 +46,7 @@ import { MatIconModule } from '@angular/material/icon';
     .event-log {
       height: 100%;
       min-height: 200px;
+      max-height: 400px;
       overflow-y: auto;
     }
 
@@ -81,6 +92,7 @@ import { MatIconModule } from '@angular/material/icon';
       border-radius: 8px;
       border: 1px solid rgba(255, 255, 255, 0.05);
       transition: all 0.2s ease;
+      align-items: center;
     }
 
     .event-item:hover {
@@ -91,6 +103,10 @@ import { MatIconModule } from '@angular/material/icon';
     .event-item.critical {
       background: rgba(244, 67, 54, 0.05);
       border-color: rgba(244, 67, 54, 0.2);
+    }
+
+    .event-item.acknowledged {
+      opacity: 0.6;
     }
 
     .event-icon {
@@ -127,6 +143,7 @@ import { MatIconModule } from '@angular/material/icon';
 })
 export class EventLogComponent {
   @Input() events: any[] = [];
+  @Output() eventAcknowledged = new EventEmitter<string>(); // Emit just the ID
 
   getEventIcon(event: any): string {
     switch (event.eventType) {
@@ -148,5 +165,9 @@ export class EventLogComponent {
 
   formatTime(timestamp: string): string {
     return new Date(timestamp).toLocaleTimeString();
+  }
+
+  acknowledgeEvent(eventId: string): void {
+    this.eventAcknowledged.emit(eventId); // Emit just the ID
   }
 }

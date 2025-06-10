@@ -219,26 +219,37 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges {
   }
 
   private createPmuMarker(pmu: any): L.Marker {
-    const icon = L.divIcon({
-      className: `pmu-marker ${this.getStatusClass(pmu)}`,
-      html: `<span>${pmu.pmuId}</span>`,
-      iconSize: [30, 30],
-      iconAnchor: [15, 15]
-    });
-
-    const marker = L.marker([pmu.latitude, pmu.longitude], { icon });
-    
-    marker.bindPopup(this.createPopupContent(pmu), {
-      maxWidth: 300,
-      minWidth: 250
-    });
-
-    marker.on('click', () => {
-      this.pmuSelected.emit(pmu.pmuId);
-    });
-
-    return marker;
+  // Handle both camelCase and PascalCase
+  const lat = pmu.latitude ?? pmu.Latitude;
+  const lon = pmu.longitude ?? pmu.Longitude;
+  const name = pmu.stationName ?? pmu.StationName ?? `PMU ${pmu.pmuId}`;
+  
+  if (lat === undefined || lon === undefined) {
+    console.error('Invalid PMU data - missing coordinates:', pmu);
+    // Return a default location if coordinates are missing
+    return L.marker([39.8283, -98.5795]); // Center of USA
   }
+
+  const icon = L.divIcon({
+    className: `pmu-marker ${this.getStatusClass(pmu)}`,
+    html: `<span>${pmu.pmuId}</span>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15]
+  });
+
+  const marker = L.marker([lat, lon], { icon });
+  
+  marker.bindPopup(this.createPopupContent(pmu), {
+    maxWidth: 300,
+    minWidth: 250
+  });
+
+  marker.on('click', () => {
+    this.pmuSelected.emit(pmu.pmuId);
+  });
+
+  return marker;
+}
 
   private updateMarkerStatus(marker: L.Marker, pmu: any): void {
     const element = marker.getElement();
@@ -264,50 +275,60 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges {
   }
 
   private createPopupContent(pmu: any): string {
-    const status = this.getStatusClass(pmu);
-    const statusIcon = status === 'alarm' ? '🔴' : status === 'warning' ? '🟡' : '🟢';
-    
-    return `
-      <div style="padding: 10px;">
-        <h3 style="margin: 0 0 10px 0; color: #00d4ff; font-size: 16px;">
-          ${statusIcon} ${pmu.stationName}
-        </h3>
-        <table style="width: 100%; font-size: 13px;">
-          <tr>
-            <td style="padding: 4px 0; color: #999;">Frequency:</td>
-            <td style="text-align: right; font-weight: bold; color: #fff;">
-              ${pmu.frequency.toFixed(3)} Hz
-            </td>
-          </tr>
-          <tr>
-            <td style="padding: 4px 0; color: #999;">ROCOF:</td>
-            <td style="text-align: right; font-weight: bold; color: #fff;">
-              ${pmu.rocof.toFixed(3)} Hz/s
-            </td>
-          </tr>
-          <tr>
-            <td style="padding: 4px 0; color: #999;">Voltage:</td>
-            <td style="text-align: right; font-weight: bold; color: #fff;">
-              ${(pmu.phasors[0]?.magnitude / 1000).toFixed(1)} kV
-            </td>
-          </tr>
-          <tr>
-            <td style="padding: 4px 0; color: #999;">Status:</td>
-            <td style="text-align: right; font-weight: bold;">
-              <span style="color: ${status === 'alarm' ? '#f44336' : status === 'warning' ? '#ff9800' : '#4caf50'};">
-                ${status.toUpperCase()}
-              </span>
-            </td>
-          </tr>
-        </table>
-        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #333;">
-          <small style="color: #666;">
-            Last Update: ${new Date(pmu.timestamp).toLocaleTimeString()}
-          </small>
-        </div>
-      </div>
-    `;
+  const status = this.getStatusClass(pmu);
+  const statusIcon = status === 'alarm' ? '🔴' : status === 'warning' ? '🟡' : '🟢';
+  const name = pmu.stationName ?? pmu.StationName ?? `PMU ${pmu.pmuId}`;
+  const freq = pmu.frequency ?? pmu.Frequency ?? 0;
+  const rocof = pmu.rocof ?? pmu.Rocof ?? 0;
+  
+  // Get voltage from phasors
+  let voltage = 0;
+  if (pmu.phasors && pmu.phasors.length > 0) {
+    const voltagePhasor = pmu.phasors[0];
+    voltage = (voltagePhasor.magnitude ?? voltagePhasor.Magnitude ?? 0) / 1000;
   }
+  
+  return `
+    <div style="padding: 10px;">
+      <h3 style="margin: 0 0 10px 0; color: #00d4ff; font-size: 16px;">
+        ${statusIcon} ${name}
+      </h3>
+      <table style="width: 100%; font-size: 13px;">
+        <tr>
+          <td style="padding: 4px 0; color: #999;">Frequency:</td>
+          <td style="text-align: right; font-weight: bold; color: #fff;">
+            ${freq.toFixed(3)} Hz
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 4px 0; color: #999;">ROCOF:</td>
+          <td style="text-align: right; font-weight: bold; color: #fff;">
+            ${rocof.toFixed(3)} Hz/s
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 4px 0; color: #999;">Voltage:</td>
+          <td style="text-align: right; font-weight: bold; color: #fff;">
+            ${voltage.toFixed(1)} kV
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 4px 0; color: #999;">Status:</td>
+          <td style="text-align: right; font-weight: bold;">
+            <span style="color: ${status === 'alarm' ? '#f44336' : status === 'warning' ? '#ff9800' : '#4caf50'};">
+              ${status.toUpperCase()}
+            </span>
+          </td>
+        </tr>
+      </table>
+      <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #333;">
+        <small style="color: #666;">
+          Last Update: ${new Date(pmu.timestamp).toLocaleTimeString()}
+        </small>
+      </div>
+    </div>
+  `;
+}
 
   private addCustomControls(): void {
     const legend = L.Control.extend({

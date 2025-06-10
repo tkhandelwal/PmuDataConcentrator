@@ -60,13 +60,34 @@ export class PmuDataService {
     }
   }
 
-  private updatePmuData(data: PmuData): void {
-    this.pmuDataMap.update(map => {
-      const newMap = new Map(map);
-      newMap.set(data.pmuId, data);
-      return newMap;
-    });
-  }
+  private updatePmuData(data: any): void {
+  // Normalize the data to ensure consistent property names
+  const normalizedData = this.normalizePmuData(data);
+  
+  this.pmuDataMap.update(map => {
+    const newMap = new Map(map);
+    newMap.set(normalizedData.pmuId, normalizedData);
+    return newMap;
+  });
+}
+
+private normalizePmuData(data: any): PmuData {
+  return {
+    id: data.id ?? data.Id,
+    pmuId: data.pmuId ?? data.PmuId,
+    timestamp: data.timestamp ?? data.Timestamp,
+    socTimestamp: data.socTimestamp ?? data.SocTimestamp,
+    fracSec: data.fracSec ?? data.FracSec,
+    phasors: data.phasors ?? data.Phasors ?? [],
+    frequency: data.frequency ?? data.Frequency ?? 60.0,
+    rocof: data.rocof ?? data.Rocof ?? 0,
+    status: data.status ?? data.Status ?? 0,
+    quality: data.quality ?? data.Quality ?? 0,
+    latitude: data.latitude ?? data.Latitude ?? 0,
+    longitude: data.longitude ?? data.Longitude ?? 0,
+    stationName: data.stationName ?? data.StationName ?? ''
+  };
+}
 
   getPmuDataStream(): Observable<PmuData> {
     return this.pmuDataSubject.asObservable();
