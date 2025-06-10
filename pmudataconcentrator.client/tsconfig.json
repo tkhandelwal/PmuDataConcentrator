@@ -18,7 +18,12 @@
       "src/app/types",
       "src/types"
     ],
-    "types": [ "leaflet" ],
+    "types": [
+      "leaflet",
+      "leaflet.markercluster",
+      "@types/leaflet.heat"
+    ],
+
     "experimentalDecorators": true,
     "moduleResolution": "bundler",
     "importHelpers": true,

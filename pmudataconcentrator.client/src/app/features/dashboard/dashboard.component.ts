@@ -1270,11 +1270,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
   
   // Map
   mapFilter = signal<'all' | 'alerts' | 'offline'>('all');
-  mapLayers = signal<MapLayers>({
-    transmission: true,
-    zones: false,
-    weather: false
-  });
+  mapLayers = {
+  transmission: true,
+  zones: false,
+  weather: false
+};
   
   // Alert thresholds
   private alertThresholds: AlertThresholds = {
