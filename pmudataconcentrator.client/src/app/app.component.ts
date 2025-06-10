@@ -13,6 +13,9 @@ import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
 import { filter } from 'rxjs/operators';
 import { NavigationStore } from './core/stores/navigation.store';
 import { PmuDataService } from './core/services/pmu-data.service';
+import { HubConnectionState } from '@microsoft/signalr';
+import { RouterLink, RouterLinkActive } from '@angular/router';
+import { MatMenuModule } from '@angular/material/menu';
 
 @Component({
   selector: 'app-root',
@@ -20,14 +23,17 @@ import { PmuDataService } from './core/services/pmu-data.service';
   imports: [
     CommonModule,
     RouterOutlet,
+    RouterLink,
     MatSidenavModule,
+    RouterLinkActive,
     MatToolbarModule,
     MatIconModule,
     MatButtonModule,
     MatListModule,
     MatExpansionModule,
     MatTooltipModule,
-    MatBadgeModule
+    MatBadgeModule,
+    MatMenuModule
   ],
   template: `
     <mat-sidenav-container class="sidenav-container">
@@ -442,8 +448,8 @@ export class AppComponent implements OnInit {
 
     // Monitor connection
     this.pmuDataService.getConnectionState().subscribe(state => {
-      this.isConnected.set(state === 1); // Connected
-      this.connectionStatus.set(state === 1 ? 'Connected' : 'Disconnected');
+      this.isConnected.set(state === HubConnectionState.Connected);
+      this.connectionStatus.set(state === HubConnectionState.Connected ? 'Connected' : 'Disconnected');
     });
 
     // Check XR support

@@ -279,9 +279,9 @@ export class Network3DComponent implements OnInit, OnDestroy {
     this.generateIEEE118BusSystem();
 
     // Subscribe to real-time PMU data
-    this.pmuDataService.pmuDataList()
+    this.pmuDataService.getPmuDataObservable()
       .pipe(takeUntil(this.destroy$))
-      .subscribe(pmuData => {
+      .subscribe((pmuData: PmuData[]) => {
         this.updateNodeData(pmuData);
       });
   }
@@ -328,7 +328,8 @@ export class Network3DComponent implements OnInit, OnDestroy {
 
   private initializeGraph(): void {
     requestAnimationFrame(() => {
-      this.graph = ForceGraph3D()(this.graphContainer.nativeElement)
+      const ForceGraph3D = (window as any).ForceGraph3D || ForceGraph3DLib;
+      this.graph = new ForceGraph3D()(this.graphContainer.nativeElement)
         .graphData(this.graphData)
         .backgroundColor('#0a0a0a')
         .nodeThreeObject((node: any) => this.createNodeObject(node))

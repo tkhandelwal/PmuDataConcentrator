@@ -1,48 +1,40 @@
+// src/app/types/leaflet-extensions.d.ts
 import * as L from 'leaflet';
 
 declare module 'leaflet' {
-  namespace control {
-    function zoom(options?: Control.ZoomOptions): Control.Zoom;
-    function scale(options?: Control.ScaleOptions): Control.Scale;
+  export namespace control {
+    function zoom(options?: L.Control.ZoomOptions): L.Control.Zoom;
+    function scale(options?: L.Control.ScaleOptions): L.Control.Scale;
   }
-  
-  interface MarkerClusterGroupOptions extends LayerOptions {
+
+  export interface MarkerClusterGroupOptions extends L.LayerOptions {
     chunkedLoading?: boolean;
     spiderfyOnMaxZoom?: boolean;
     showCoverageOnHover?: boolean;
     zoomToBoundsOnClick?: boolean;
-    maxClusterRadius?: number;
-    iconCreateFunction?: (cluster: any) => Icon | DivIcon;
+    maxClusterRadius?: number | ((zoom: number) => number);
+    iconCreateFunction?: ((cluster: any) => L.Icon | L.DivIcon);
+    disableClusteringAtZoom?: number;
+    animate?: boolean;
+    removeOutsideVisibleBounds?: boolean;
   }
-  
-  class MarkerClusterGroup extends FeatureGroup {
-    constructor(options?: MarkerClusterGroupOptions);
-    getChildCount(): number;
-    getAllChildMarkers(): Marker[];
-    clearLayers(): this;
-  }
-  
-  function markerClusterGroup(options?: MarkerClusterGroupOptions): MarkerClusterGroup;
-  
-  interface HeatLayerOptions {
+
+  export function markerClusterGroup(options?: MarkerClusterGroupOptions): any;
+
+  export interface HeatLayerOptions {
     radius?: number;
     blur?: number;
     maxZoom?: number;
     gradient?: { [key: number]: string };
+    minOpacity?: number;
+    max?: number;
   }
-  
-  interface HeatLayer extends Layer {
-    setLatLngs(latlngs: number[][]): this;
-    addLatLng(latlng: number[]): this;
+
+  export interface HeatLayer extends L.Layer {
+    setLatLngs(latlngs: L.LatLngExpression[]): this;
+    addLatLng(latlng: L.LatLngExpression): this;
+    setOptions(options: HeatLayerOptions): this;
   }
-  
-  function heatLayer(latlngs: number[][], options?: HeatLayerOptions): HeatLayer;
-  
-  // Extend DivIcon interface
-  interface DivIconOptions {
-    className?: string;
-    html?: string | HTMLElement;
-    iconSize?: PointExpression;
-    iconAnchor?: PointExpression;
-  }
+
+  export function heatLayer(latlngs: L.LatLngExpression[], options?: HeatLayerOptions): HeatLayer;
 }

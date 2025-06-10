@@ -256,9 +256,8 @@ export class GlobeViewComponent implements OnInit, OnDestroy {
   }
 
   private initializeGlobe(): void {
-    // Run outside Angular for performance
     requestAnimationFrame(() => {
-      this.globe = Globe()(this.globeContainer.nativeElement)
+      this.globe = new Globe(this.globeContainer.nativeElement)
         .globeImageUrl('//unpkg.com/three-globe/example/img/earth-night.jpg')
         .bumpImageUrl('//unpkg.com/three-globe/example/img/earth-topology.png')
         .backgroundImageUrl('//unpkg.com/three-globe/example/img/night-sky.png')
@@ -284,12 +283,12 @@ export class GlobeViewComponent implements OnInit, OnDestroy {
       .pointsData(this.pmuData)
       .pointLat('latitude')
       .pointLng('longitude')
-      .pointColor(this.getPmuColor.bind(this))
-      .pointAltitude(d => this.getAltitudeByDataLayer(d))
-      .pointRadius(d => this.getPmuRadius(d))
-      .pointLabel(d => this.getPmuLabel(d))
-      .onPointClick(this.onPmuClick.bind(this))
-      .onPointHover(this.onPmuHover.bind(this));
+      .pointColor((d: any) => this.getPmuColor(d))
+      .pointAltitude((d: any) => this.getAltitudeByDataLayer(d))
+      .pointRadius((d: any) => this.getPmuRadius(d))
+      .pointLabel((d: any) => this.getPmuLabel(d))
+      .onPointClick((pmu: any) => this.onPmuClick(pmu))
+      .onPointHover((pmu: any) => this.onPmuHover(pmu));
   }
 
   private setupTransmissionLayer(): void {
@@ -299,12 +298,12 @@ export class GlobeViewComponent implements OnInit, OnDestroy {
       .arcStartLng('startLng')
       .arcEndLat('endLat')
       .arcEndLng('endLng')
-      .arcColor(d => this.getLineColor(d))
-      .arcStroke(d => this.getLineWidth(d))
+      .arcColor((d: any) => this.getLineColor(d))
+      .arcStroke((d: any) => this.getLineWidth(d))
       .arcDashLength(0.4)
       .arcDashGap(0.2)
-      .arcDashAnimateTime(d => 2000 / (d.loading / 100))
-      .arcLabel(d => this.getLineLabel(d))
+      .arcDashAnimateTime((d: any) => 2000 / (d.loading / 100))
+      .arcLabel((d: any) => this.getLineLabel(d))
       .onArcClick(this.onLineClick.bind(this));
   }
 
@@ -317,10 +316,10 @@ export class GlobeViewComponent implements OnInit, OnDestroy {
         .hexBinPointLat('lat')
         .hexBinPointLng('lng')
         .hexBinPointWeight('weight')
-        .hexAltitude(d => d.sumWeight * 0.001)
+        .hexAltitude((d: any) => d.sumWeight * 0.001)
         .hexBinResolution(4)
-        .hexTopColor(d => this.getHeatmapColor(d))
-        .hexSideColor(d => this.getHeatmapColor(d))
+        .hexTopColor((d: any) => this.getHeatmapColor(d))
+        .hexSideColor((d: any) => this.getHeatmapColor(d))
         .hexBinMerge(true)
         .hexTransitionDuration(1000);
     }

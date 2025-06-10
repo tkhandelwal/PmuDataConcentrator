@@ -1,6 +1,6 @@
 import { signalStore, withState, withComputed, withMethods, patchState } from '@ngrx/signals';
 import { computed, inject } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 
 export interface Breadcrumb {
   label: string;
@@ -52,7 +52,7 @@ export const NavigationStore = signalStore(
 
       updateBreadcrumbs(router: Router) {
         const breadcrumbs: Breadcrumb[] = [];
-        let route = router.routerState.root;
+        let route: ActivatedRoute | null = router.routerState.root;
 
         while (route) {
           if (route.snapshot.data['breadcrumb']) {
@@ -62,7 +62,7 @@ export const NavigationStore = signalStore(
               url: url
             });
           }
-          route = route.firstChild;
+          route = route.firstChild; // Now this is properly typed
         }
 
         patchState(store, {
