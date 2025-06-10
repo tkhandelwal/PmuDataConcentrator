@@ -681,34 +681,44 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   }
 
   private initializeMap(): void {
-    // Initialize map centered on USA
+    // Destroy existing map if any
+    if (this.map) {
+      this.map.remove();
+    }
+
+    // Initialize map with proper settings
     this.map = (L as any).map('pmu-map', {
-      center: [39.8283, -98.5795],
+      center: [39.8283, -98.5795], // Center of USA
       zoom: 4,
-      minZoom: 3,  // Add minimum zoom
-      maxZoom: 10, // Add maximum zoom
-      maxBounds: [  // Add bounds to prevent panning too far
-        [-10, -180],  // Southwest coordinates
-        [85, -30]     // Northeast coordinates  
-      ],
-      maxBoundsViscosity: 1.0,  // How strong to snap back to bounds
-      zoomControl: true,
+      minZoom: 3,
+      maxZoom: 10,
+      zoomControl: false, // We'll add custom controls
       attributionControl: false,
-      preferCanvas: true,
-      renderer: (L as any).canvas({ padding: 0.5 }) // Canvas renderer for better performance
+      preferCanvas: true
     });
 
-    // Add dark tile layer
-    (L as any).tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    // Use OpenStreetMap tiles as primary (more reliable)
+    const tileLayer = (L as any).tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 10,
       minZoom: 3,
-      subdomains: 'abcd',
-      updateWhenIdle: true,
-      updateWhenZooming: false,
-      keepBuffer: 2
+      attribution: '© OpenStreetMap contributors',
+      className: 'map-tiles'
     }).addTo(this.map);
 
-    // Initialize marker cluster group with performance optimizations
+    // Add dark overlay to match theme
+    const darkOverlay = (L as any).tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png', {
+      maxZoom: 10,
+      minZoom: 3,
+      opacity: 0.8
+    }).addTo(this.map);
+
+    // Force map to recalculate size
+    setTimeout(() => {
+      this.map.invalidateSize();
+    }, 100);
+
+    
+    // Initialize marker cluster group
     this.markersLayer = (L as any).markerClusterGroup({
       chunkedLoading: true,
       spiderfyOnMaxZoom: true,
@@ -717,56 +727,39 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       maxClusterRadius: 60,
       disableClusteringAtZoom: 10,
       animate: false,
-      removeOutsideVisibleBounds: true,
-      spiderfyDistanceMultiplier: 2,
-      iconCreateFunction: (cluster: any) => {
-        const childCount = cluster.getChildCount();
-        const markers = cluster.getAllChildMarkers();
-        const hasAlarm = markers.some((m: any) => m.options.className?.includes('alarm'));
-        const hasWarning = markers.some((m: any) => m.options.className?.includes('warning'));
-
-        let className = 'leaflet-marker-cluster ';
-        if (hasAlarm) className += 'alarm';
-        else if (hasWarning) className += 'warning';
-
-        return (L as any).divIcon({
-          html: `<div><span>${childCount}</span></div>`,
-          className: className,
-          iconSize: (L as any).point(40, 40)
-        });
-      }
+      removeOutsideVisibleBounds: true
     });
 
-    // Add layers to map
+    // Add layers
     this.zonesLayer.addTo(this.map);
     this.linesLayer.addTo(this.map);
     this.voltageContoursLayer.addTo(this.map);
     this.markersLayer.addTo(this.map);
 
-    // Initialize control zones
-    this.initializeControlZones();
+    // Initialize components after map is ready
+    this.map.whenReady(() => {
+      this.initializeControlZones();
+      this.initializeTransmissionLines();
+      this.addCustomControls();
 
-    // Initialize transmission lines
-    this.initializeTransmissionLines();
-
-    // Add custom controls
-    this.addCustomControls();
-
-    // Set up real-time updates
-    this.startRealtimeUpdates();
-
-    // Handle map events
-    this.map.on('click', () => {
-      this.selectedZone = null;
+      // Update markers if data exists
+      if (this.pmuData && this.pmuData.length > 0) {
+        setTimeout(() => {
+          this.updateMarkers();
+          // Fit bounds to show all markers
+          if (this.markers.size > 0) {
+            const bounds = (L as any).latLngBounds(
+              Array.from(this.markers.values()).map(m => m.getLatLng())
+            );
+            this.map.fitBounds(bounds, { padding: [50, 50] });
+          }
+        }, 500);
+      }
     });
 
-    // Optimize map interactions
-    this.map.on('zoomstart', () => {
-      this.map.options.updateWhenZooming = false;
-    });
-
-    this.map.on('zoomend', () => {
-      this.map.options.updateWhenZooming = true;
+    // Handle resize
+    window.addEventListener('resize', () => {
+      this.map.invalidateSize();
     });
   }
 

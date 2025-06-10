@@ -1538,28 +1538,62 @@ export class DashboardComponent implements OnInit, OnDestroy {
       const rocofs = pmuDataList.map(pmu => Math.abs(pmu.rocof));
       const avgRocof = rocofs.reduce((sum, r) => sum + r, 0) / rocofs.length;
 
-      // Calculate voltage stability (simplified)
-      const voltages = pmuDataList.map(pmu => {
-        const vPhasor = pmu.phasors?.find((p: any) => p.type === 0);
-        return vPhasor ? vPhasor.magnitude : 1.0;
+      // Calculate voltage stability properly
+      let voltageSum = 0;
+      let voltageCount = 0;
+      let voltageDeviationSum = 0;
+
+      pmuDataList.forEach(pmu => {
+        if (pmu.phasors && pmu.phasors.length > 0) {
+          const vPhasor = pmu.phasors.find((p: any) =>
+            (p.type === 0 || p.Type === 0) &&
+            ((p.name || p.Name || '').includes('V'))
+          );
+
+          if (vPhasor) {
+            const magnitude = vPhasor.magnitude ?? vPhasor.Magnitude ?? 345000;
+            const nominal = 345000; // 345kV nominal
+            const voltagePU = magnitude / nominal;
+
+            voltageSum += voltagePU;
+            voltageCount++;
+            voltageDeviationSum += Math.abs(1.0 - voltagePU);
+          }
+        }
       });
-      const avgVoltage = voltages.reduce((sum, v) => sum + v, 0) / voltages.length;
-      const voltageStability = 100 - Math.abs(1.0 - avgVoltage) * 100;
+
+      // Calculate voltage stability index (0-100%)
+      let voltageStability = 100;
+      if (voltageCount > 0) {
+        const avgVoltagePU = voltageSum / voltageCount;
+        const avgDeviation = voltageDeviationSum / voltageCount;
+
+        // Penalize for average deviation from 1.0 p.u.
+        voltageStability = Math.max(0, 100 - (avgDeviation * 200));
+
+        // Additional penalty for extreme deviations
+        if (avgVoltagePU < 0.90 || avgVoltagePU > 1.10) {
+          voltageStability = Math.min(voltageStability, 50);
+        }
+      }
 
       // Calculate phase angle spread
-      const angles = pmuDataList.map(pmu => {
-        const vPhasor = pmu.phasors?.find((p: any) => p.type === 0);
-        return vPhasor ? vPhasor.angle : 0;
-      });
-      const minAngle = Math.min(...angles);
+      const angles = pmuDataList
+        .filter(pmu => pmu.phasors && pmu.phasors.length > 0)
+        .map(pmu => {
+          const vPhasor = pmu.phasors.find((p: any) => p.type === 0 || p.Type === 0);
+          return vPhasor ? (vPhasor.angle ?? vPhasor.Angle ?? 0) : 0;
+        });
+
       const maxAngle = Math.max(...angles);
+      const minAngle = Math.min(...angles);
       const phaseAngleSpread = maxAngle - minAngle;
 
       // Calculate data latency
       const latencies = pmuDataList.map(pmu => {
         const now = Date.now();
         const timestamp = new Date(pmu.timestamp).getTime();
-        return now - timestamp;
+        return Math.max(0, now - timestamp);
       });
       const avgLatency = latencies.reduce((sum, l) => sum + l, 0) / latencies.length;
 
@@ -1910,6 +1944,27 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   navigateToAnalytics(): void {
-    this.router.navigate(['/analytics']);
+    console.log('Advanced Analytics button clicked');
+
+    // Use Promise-based navigation with error handling
+    this.router.navigate(['/analytics'])
+      .then(success => {
+        if (success) {
+          console.log('Navigation to analytics successful');
+        } else {
+          console.error('Navigation to analytics failed');
+          // Fallback: try with absolute path
+          this.router.navigateByUrl('/analytics');
+        }
+      })
+      .catch(error => {
+        console.error('Navigation error:', error);
+        // Show error to user
+        this.snackBar.open('Failed to open Advanced Analytics', 'Retry', {
+          duration: 3000
+        }).onAction().subscribe(() => {
+          this.navigateToAnalytics();
+        });
+      });
   }
 }

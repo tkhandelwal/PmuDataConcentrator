@@ -286,6 +286,12 @@ export class PmuDataService {
     const events: PowerSystemEvent[] = [];
     const now = Date.now();
 
+    // Only check every 5 seconds per PMU
+    const lastCheck = this.lastAnomalyCheck.get(pmuData.pmuId) || 0;
+    if (now - lastCheck < 5000) return;
+
+    this.lastAnomalyCheck.set(pmuData.pmuId, now);
+
     // Frequency anomalies
     const freqDev = Math.abs(pmuData.frequency - this.nominalFrequency);
     if (freqDev > 0.5) {
@@ -297,7 +303,7 @@ export class PmuDataService {
           pmuId: pmuData.pmuId,
           eventType: EventType.FrequencyDeviation,
           severity: freqDev > 1.0 ? EventSeverity.Critical : EventSeverity.Warning,
-          description: `Frequency deviation: ${pmuData.frequency.toFixed(3)} Hz (${freqDev > 0 ? '+' : ''}${(freqDev).toFixed(3)} Hz)`,
+          description: `Frequency deviation: ${pmuData.frequency.toFixed(3)} Hz (${freqDev > 0 ? '+' : ''}${freqDev.toFixed(3)} Hz)`,
           isAcknowledged: false
         });
       }
@@ -319,37 +325,24 @@ export class PmuDataService {
       }
     }
 
-    // Voltage anomalies with hysteresis
+    // Voltage anomalies - less sensitive
     if (pmuData.phasors && pmuData.phasors.length > 0) {
       const voltagePhasor = pmuData.phasors.find(p => p.type === 0);
       if (voltagePhasor) {
         const voltagePU = voltagePhasor.magnitude / 345000;
         const eventKey = `voltage-${pmuData.pmuId}`;
 
-        // Check if we already have an active voltage event for this PMU
-        const hasActiveVoltageEvent = this.hasActiveVoltageEvent(pmuData.pmuId);
-
-        // Use different thresholds based on whether there's an active event (hysteresis)
-        const lowerThreshold = hasActiveVoltageEvent ? 0.95 + this.VOLTAGE_THRESHOLD_MARGIN : 0.95;
-        const upperThreshold = hasActiveVoltageEvent ? 1.05 - this.VOLTAGE_THRESHOLD_MARGIN : 1.05;
-
-        if ((voltagePU < lowerThreshold || voltagePU > upperThreshold) &&
-          this.shouldCreateEvent(eventKey, now)) {
+        // Only create events for significant deviations
+        if ((voltagePU < 0.92 || voltagePU > 1.08) && this.shouldCreateEvent(eventKey, now)) {
           events.push({
             id: `${eventKey}-${now}`,
             timestamp: new Date(),
             pmuId: pmuData.pmuId,
             eventType: EventType.VoltageViolation,
-            severity: voltagePU < 0.9 || voltagePU > 1.1 ? EventSeverity.Critical : EventSeverity.Warning,
+            severity: voltagePU < 0.88 || voltagePU > 1.12 ? EventSeverity.Critical : EventSeverity.Warning,
             description: `Voltage violation: ${voltagePU.toFixed(3)} p.u. (${(voltagePU * 345).toFixed(1)} kV)`,
             isAcknowledged: false
           });
-
-          // Track active voltage event
-          this.setActiveVoltageEvent(pmuData.pmuId, true);
-        } else if (voltagePU >= lowerThreshold && voltagePU <= upperThreshold) {
-          // Clear active voltage event when voltage returns to normal
-          this.setActiveVoltageEvent(pmuData.pmuId, false);
         }
       }
     }
@@ -357,6 +350,9 @@ export class PmuDataService {
     // Emit events
     events.forEach(event => this.eventSubject.next(event));
   }
+
+  // Add this property to the service
+  private lastAnomalyCheck = new Map<number, number>();
 
   private shouldCreateEvent(eventKey: string, currentTime: number): boolean {
     const lastEventTime = this.eventThrottleMap.get(eventKey) || 0;

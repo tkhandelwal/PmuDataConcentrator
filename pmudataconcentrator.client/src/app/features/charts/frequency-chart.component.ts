@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, OnChanges, SimpleChanges, ViewChild, ElementRef, AfterViewInit, OnDestroy, ChangeDetectionStrategy } from '@angular/core';
+import { Component, Input, OnInit, OnChanges, SimpleChanges, ViewChild, ElementRef, AfterViewInit, OnDestroy, ChangeDetectionStrategy, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import 'chartjs-adapter-date-fns';
@@ -11,34 +11,35 @@ Chart.register(...registerables);
   imports: [CommonModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="chart-wrapper">
+    <div class="chart-container">
       <canvas #frequencyChart></canvas>
-      <div class="chart-loading" *ngIf="!chartInitialized">
-        <span>Loading chart...</span>
+      <div class="no-data" *ngIf="!hasData">
+        <span>No frequency data available</span>
       </div>
     </div>
   `,
   styles: [`
-    .chart-wrapper {
+    .chart-container {
       position: relative;
       width: 100%;
       height: 100%;
-      min-height: 200px;
+      min-height: 300px;
+      padding: 10px;
     }
     
     canvas {
-      max-width: 100%;
-      max-height: 100%;
+      width: 100% !important;
+      height: 100% !important;
     }
     
-    .chart-loading {
+    .no-data {
       position: absolute;
       inset: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      background: rgba(0,0,0,0.5);
-      color: #999;
+      color: #666;
+      font-size: 14px;
     }
   `]
 })
@@ -48,35 +49,32 @@ export class FrequencyChartComponent implements AfterViewInit, OnChanges, OnDest
   @Input() timeWindow: number = 300;
 
   private chart?: Chart;
-  chartInitialized = false;
-  private resizeObserver?: ResizeObserver;
+  hasData = false;
+  private initialized = false;
+
+  constructor(private ngZone: NgZone) { }
 
   ngAfterViewInit(): void {
-    // Use requestAnimationFrame to ensure DOM is ready
-    requestAnimationFrame(() => {
-      this.initializeChart();
-      this.setupResizeObserver();
+    // Initialize chart outside Angular zone for better performance
+    this.ngZone.runOutsideAngular(() => {
+      setTimeout(() => {
+        this.initializeChart();
+        this.initialized = true;
+        this.updateChart();
+      }, 100);
     });
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (this.chart && this.chartInitialized && (changes['pmuData'] || changes['timeWindow'])) {
-      this.updateChart();
+    if (this.initialized && (changes['pmuData'] || changes['timeWindow'])) {
+      this.ngZone.runOutsideAngular(() => {
+        this.updateChart();
+      });
     }
   }
 
   ngOnDestroy(): void {
-    this.resizeObserver?.disconnect();
     this.chart?.destroy();
-  }
-
-  private setupResizeObserver(): void {
-    if (this.chartCanvas?.nativeElement) {
-      this.resizeObserver = new ResizeObserver(() => {
-        this.chart?.resize();
-      });
-      this.resizeObserver.observe(this.chartCanvas.nativeElement);
-    }
   }
 
   private initializeChart(): void {
@@ -84,6 +82,13 @@ export class FrequencyChartComponent implements AfterViewInit, OnChanges, OnDest
 
     const ctx = this.chartCanvas.nativeElement.getContext('2d');
     if (!ctx) return;
+
+    // Set canvas size
+    const container = this.chartCanvas.nativeElement.parentElement;
+    if (container) {
+      this.chartCanvas.nativeElement.width = container.clientWidth - 20;
+      this.chartCanvas.nativeElement.height = container.clientHeight - 20;
+    }
 
     const config: ChartConfiguration = {
       type: 'line',
@@ -97,26 +102,33 @@ export class FrequencyChartComponent implements AfterViewInit, OnChanges, OnDest
           pointRadius: 0,
           tension: 0.2,
           fill: true
+        }, {
+          label: 'Nominal (60 Hz)',
+          data: [],
+          borderColor: 'rgba(255, 255, 255, 0.3)',
+          borderDash: [5, 5],
+          borderWidth: 1,
+          pointRadius: 0,
+          fill: false
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        animation: {
-          duration: 0 // Disable animations for real-time data
-        },
+        animation: false,
         interaction: {
           mode: 'index',
           intersect: false
         },
         plugins: {
           legend: {
-            display: true,  // Change to true
+            display: true,
+            position: 'top',
             labels: {
-              color: '#e0e0e0',  // Make sure text is visible
-              font: {
-                size: 12
-              }
+              color: '#e0e0e0',
+              font: { size: 11 },
+              boxWidth: 20,
+              padding: 10
             }
           },
           tooltip: {
@@ -127,8 +139,14 @@ export class FrequencyChartComponent implements AfterViewInit, OnChanges, OnDest
             bodyColor: '#e0e0e0',
             borderColor: '#333',
             borderWidth: 1,
+            displayColors: true,
             callbacks: {
-              label: (context) => `${context.parsed.y.toFixed(3)} Hz`
+              label: (context) => {
+                if (context.datasetIndex === 0) {
+                  return `Frequency: ${context.parsed.y.toFixed(3)} Hz`;
+                }
+                return 'Nominal: 60.000 Hz';
+              }
             }
           }
         },
@@ -143,11 +161,19 @@ export class FrequencyChartComponent implements AfterViewInit, OnChanges, OnDest
             },
             grid: {
               color: 'rgba(255, 255, 255, 0.1)',
+              display: true
             },
             ticks: {
               color: '#e0e0e0',
-              maxTicksLimit: 8,
-              autoSkip: true
+              maxTicksLimit: 6,
+              autoSkip: true,
+              font: { size: 10 }
+            },
+            title: {
+              display: true,
+              text: 'Time',
+              color: '#999',
+              font: { size: 11 }
             }
           },
           y: {
@@ -155,11 +181,19 @@ export class FrequencyChartComponent implements AfterViewInit, OnChanges, OnDest
             max: 60.5,
             grid: {
               color: 'rgba(255, 255, 255, 0.1)',
+              display: true
             },
             ticks: {
-              color: '#666',
+              color: '#e0e0e0',
               callback: (value) => `${value} Hz`,
-              stepSize: 0.1
+              stepSize: 0.1,
+              font: { size: 10 }
+            },
+            title: {
+              display: true,
+              text: 'Frequency (Hz)',
+              color: '#999',
+              font: { size: 11 }
             }
           }
         }
@@ -167,12 +201,13 @@ export class FrequencyChartComponent implements AfterViewInit, OnChanges, OnDest
     };
 
     this.chart = new Chart(ctx, config);
-    this.chartInitialized = true;
-    this.updateChart();
   }
 
   private updateChart(): void {
-    if (!this.chart || !this.chartInitialized || this.pmuData.length === 0) return;
+    if (!this.chart || !this.pmuData || this.pmuData.length === 0) {
+      this.hasData = false;
+      return;
+    }
 
     const now = new Date();
     const cutoff = new Date(now.getTime() - this.timeWindow * 1000);
@@ -185,7 +220,7 @@ export class FrequencyChartComponent implements AfterViewInit, OnChanges, OnDest
 
       const timestamp = new Date(pmu.timestamp).getTime();
       if (timestamp > cutoff.getTime()) {
-        const roundedTime = Math.floor(timestamp / 1000) * 1000; // Round to nearest second
+        const roundedTime = Math.floor(timestamp / 1000) * 1000;
 
         if (!dataMap.has(roundedTime)) {
           dataMap.set(roundedTime, []);
@@ -202,25 +237,24 @@ export class FrequencyChartComponent implements AfterViewInit, OnChanges, OnDest
       }))
       .sort((a, b) => a.x - b.x);
 
-    // Update chart
-    this.chart.data.datasets[0].data = chartData as any;
+    if (chartData.length > 0) {
+      this.hasData = true;
 
-    // Add reference line at 60Hz
-    if (!this.chart.data.datasets[1] && chartData.length > 0) {
-      this.chart.data.datasets.push({
-        label: 'Nominal',
-        data: [
-          { x: chartData[0].x, y: 60 },
-          { x: chartData[chartData.length - 1].x, y: 60 }
-        ] as any,
-        borderColor: 'rgba(255, 255, 255, 0.3)',
-        borderDash: [5, 5],
-        borderWidth: 1,
-        pointRadius: 0,
-        fill: false
+      // Update frequency data
+      this.chart.data.datasets[0].data = chartData as any;
+
+      // Update reference line
+      this.chart.data.datasets[1].data = [
+        { x: chartData[0].x, y: 60 },
+        { x: chartData[chartData.length - 1].x, y: 60 }
+      ] as any;
+
+      // Update chart in Angular zone to trigger change detection
+      this.ngZone.run(() => {
+        this.chart!.update('none');
       });
+    } else {
+      this.hasData = false;
     }
-
-    this.chart.update('none');
   }
 }
