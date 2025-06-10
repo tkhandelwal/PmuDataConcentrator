@@ -1,13 +1,22 @@
 // pmudataconcentrator.client/src/app/features/map-view/map-view.component.ts
 import { Component, Input, Output, EventEmitter, OnInit, AfterViewInit, OnChanges, SimpleChanges, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MatIconModule } from '@angular/material/icon'; // Add this import
+import { MatIconModule } from '@angular/material/icon';
 import * as L from 'leaflet';
 import 'leaflet.markercluster';
 import 'leaflet.heat';
 
+// Declare the global L with extended types
+declare global {
+  interface Window {
+    L: typeof L;
+  }
+}
+
+// Add type declarations for Leaflet extensions
 declare module 'leaflet' {
   export function heatLayer(latlngs: number[][], options?: any): any;
+  export const markerClusterGroup: any;
 }
 
 interface TransmissionLine {
@@ -446,14 +455,14 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   @Output() lineSelected = new EventEmitter<string>();
   @Output() zoneSelected = new EventEmitter<string>();
   
-  private map!: L.Map;
-  private markersLayer!: L.MarkerClusterGroup;
-  private linesLayer = new L.LayerGroup();
-  private zonesLayer = new L.LayerGroup();
+  private map!: any; // Use any type for Leaflet map
+  private markersLayer!: any; // Use any type for MarkerClusterGroup
+  private linesLayer: any;
+  private zonesLayer: any;
   private heatmapLayer: any;
-  private voltageContoursLayer = new L.LayerGroup();
-  private markers = new Map<number, L.Marker>();
-  private transmissionLines = new Map<string, L.Polyline>();
+  private voltageContoursLayer: any;
+  private markers = new Map<number, any>(); // Use any for markers
+  private transmissionLines = new Map<string, any>(); // Use any for polylines
   private updateInterval: any;
   
   // Control states
@@ -550,6 +559,13 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     }
   ];
 
+  constructor() {
+    // Initialize layer groups
+    this.linesLayer = (L as any).layerGroup();
+    this.zonesLayer = (L as any).layerGroup();
+    this.voltageContoursLayer = (L as any).layerGroup();
+  }
+
   ngOnInit(): void {
     this.initializeIcons();
   }
@@ -580,7 +596,7 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
   private initializeIcons(): void {
     // Initialize default Leaflet icons
-    const iconDefault = L.icon({
+    const iconDefault = (L as any).icon({
       iconUrl: 'assets/marker-icon.png',
       iconRetinaUrl: 'assets/marker-icon-2x.png',
       shadowUrl: 'assets/marker-shadow.png',
@@ -590,12 +606,12 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       tooltipAnchor: [16, -28],
       shadowSize: [41, 41]
     });
-    L.Marker.prototype.options.icon = iconDefault;
+    ((L as any).Marker as any).prototype.options.icon = iconDefault;
   }
 
   private initializeMap(): void {
     // Initialize map centered on USA
-    this.map = L.map('pmu-map', {
+    this.map = (L as any).map('pmu-map', {
       center: [39.8283, -98.5795],
       zoom: 4,
       zoomControl: true,
@@ -604,35 +620,35 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     });
 
     // Add dark tile layer
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    (L as any).tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       maxZoom: 19,
       subdomains: 'abcd'
     }).addTo(this.map);
 
     // Initialize marker cluster group
-        this.markersLayer = L.markerClusterGroup({
-        chunkedLoading: true,
-        spiderfyOnMaxZoom: true,
-        showCoverageOnHover: false,
-        zoomToBoundsOnClick: true,
-        maxClusterRadius: 50,
-        iconCreateFunction: (cluster: any) => {
-          const childCount = cluster.getChildCount();
-          const markers = cluster.getAllChildMarkers();
-          const hasAlarm = markers.some((m: any) => m.options.className?.includes('alarm'));
-          const hasWarning = markers.some((m: any) => m.options.className?.includes('warning'));
-      
-          let className = 'leaflet-marker-cluster ';
-          if (hasAlarm) className += 'alarm';
-          else if (hasWarning) className += 'warning';
-      
-          return L.divIcon({
-            html: `<div><span>${childCount}</span></div>`,
-            className: className,
-            iconSize: L.point(40, 40)
-          });
-        }
-      });
+    this.markersLayer = (L as any).markerClusterGroup({
+      chunkedLoading: true,
+      spiderfyOnMaxZoom: true,
+      showCoverageOnHover: false,
+      zoomToBoundsOnClick: true,
+      maxClusterRadius: 50,
+      iconCreateFunction: (cluster: any) => {
+        const childCount = cluster.getChildCount();
+        const markers = cluster.getAllChildMarkers();
+        const hasAlarm = markers.some((m: any) => m.options.className?.includes('alarm'));
+        const hasWarning = markers.some((m: any) => m.options.className?.includes('warning'));
+    
+        let className = 'leaflet-marker-cluster ';
+        if (hasAlarm) className += 'alarm';
+        else if (hasWarning) className += 'warning';
+    
+        return (L as any).divIcon({
+          html: `<div><span>${childCount}</span></div>`,
+          className: className,
+          iconSize: (L as any).point(40, 40)
+        });
+      }
+    });
 
     // Add layers to map
     this.zonesLayer.addTo(this.map);
@@ -660,15 +676,15 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
   private initializeControlZones(): void {
     this.controlZones.forEach(zone => {
-      const bounds = L.latLngBounds(zone.bounds as L.LatLngBoundsLiteral);
-      const rect = L.rectangle(bounds, {
+      const bounds = (L as any).latLngBounds(zone.bounds as any);
+      const rect = (L as any).rectangle(bounds, {
         className: 'control-zone',
         weight: 2,
         interactive: true
       });
       
-      rect.on('click', (e) => {
-        L.DomEvent.stopPropagation(e);
+      rect.on('click', (e: any) => {
+        (L as any).DomEvent.stopPropagation(e);
         this.selectedZone = zone;
         this.zoneSelected.emit(zone.id);
       });
@@ -684,14 +700,14 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
   private initializeTransmissionLines(): void {
     this.transmissionData.forEach(line => {
-      const polyline = L.polyline([line.from, line.to] as L.LatLngTuple[], {
+      const polyline = (L as any).polyline([line.from, line.to], {
         className: `transmission-line ${line.status}`,
         weight: 3,
         interactive: true
       });
       
-      polyline.on('click', (e) => {
-        L.DomEvent.stopPropagation(e);
+      polyline.on('click', (e: any) => {
+        (L as any).DomEvent.stopPropagation(e);
         this.showLineInfo(line);
         this.lineSelected.emit(line.id);
       });
@@ -748,12 +764,12 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       </div>
     `;
     
-    const center = L.latLng(
+    const center = (L as any).latLng(
       (line.from[0] + line.to[0]) / 2,
       (line.from[1] + line.to[1]) / 2
     );
     
-    L.popup()
+    (L as any).popup()
       .setLatLng(center)
       .setContent(content)
       .openOn(this.map);
@@ -777,27 +793,27 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       if (!this.markers.has(pmu.pmuId)) {
         const marker = this.createPmuMarker(pmu);
         this.markers.set(pmu.pmuId, marker);
-        this.markersLayer.addLayer(marker);
+        this.markersLayer.addLayers([marker]);
       } else {
         this.updateMarkerStatus(this.markers.get(pmu.pmuId)!, pmu);
       }
     });
   }
 
-  private createPmuMarker(pmu: any): L.Marker {
+  private createPmuMarker(pmu: any): any {
     const lat = pmu.latitude ?? pmu.Latitude;
     const lon = pmu.longitude ?? pmu.Longitude;
     const name = pmu.stationName ?? pmu.StationName ?? `PMU ${pmu.pmuId}`;
     
     const status = this.getPmuStatus(pmu);
-    const icon = L.divIcon({
+    const icon = (L as any).divIcon({
       className: `pmu-marker ${status}`,
       html: `<span>${pmu.pmuId}</span>`,
       iconSize: [32, 32],
       iconAnchor: [16, 16]
     });
 
-    const marker = L.marker([lat, lon], { 
+    const marker = (L as any).marker([lat, lon], { 
       icon,
       className: status 
     });
@@ -816,7 +832,7 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     return marker;
   }
 
-  private updateMarkerStatus(marker: L.Marker, pmu: any): void {
+  private updateMarkerStatus(marker: any, pmu: any): void {
     const status = this.getPmuStatus(pmu);
     const element = marker.getElement();
     if (element) {
@@ -940,7 +956,7 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     `;
   }
 
-  private animateMarkerSelection(marker: L.Marker): void {
+  private animateMarkerSelection(marker: any): void {
     const element = marker.getElement();
     if (element) {
       element.style.transition = 'transform 0.3s ease';
@@ -977,7 +993,7 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
   private updateTransmissionLines(): void {
     // Update line status based on PMU data
-    this.transmissionLines.forEach((line, id) => {
+    this.transmissionLines.forEach((line: any, id: string) => {
       const lineData = this.transmissionData.find(l => l.id === id);
       if (lineData) {
         // Simulate loading changes
@@ -999,40 +1015,40 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   }
 
   private updateHeatmap(): void {
-  if (!this.heatmapLayer) {
-    // Initialize heatmap layer
-    const heatData = this.pmuData.map(pmu => {
-      const lat = pmu.latitude ?? pmu.Latitude;
-      const lon = pmu.longitude ?? pmu.Longitude;
-      const intensity = Math.abs(pmu.frequency - 60.0) * 100;
-      return [lat, lon, intensity];
-    });
-    
-    // Use L.heatLayer instead of (L as any).heatLayer
-    this.heatmapLayer = L.heatLayer(heatData as [number, number, number][], {
-      radius: 50,
-      blur: 30,
-      maxZoom: 10,
-      gradient: {
-        0.0: 'blue',
-        0.25: 'cyan',
-        0.5: 'green',
-        0.75: 'yellow',
-        1.0: 'red'
-      }
-    });
-  } else {
-    // Update existing heatmap
-    const heatData = this.pmuData.map(pmu => {
-      const lat = pmu.latitude ?? pmu.Latitude;
-      const lon = pmu.longitude ?? pmu.Longitude;
-      const intensity = Math.abs(pmu.frequency - 60.0) * 100;
-      return [lat, lon, intensity];
-    });
-    
-    this.heatmapLayer.setLatLngs(heatData as [number, number, number][]);
+    if (!this.heatmapLayer) {
+      // Initialize heatmap layer
+      const heatData = this.pmuData.map(pmu => {
+        const lat = pmu.latitude ?? pmu.Latitude;
+        const lon = pmu.longitude ?? pmu.Longitude;
+        const intensity = Math.abs(pmu.frequency - 60.0) * 100;
+        return [lat, lon, intensity];
+      });
+      
+      // Use L.heatLayer
+      this.heatmapLayer = (L as any).heatLayer(heatData as [number, number, number][], {
+        radius: 50,
+        blur: 30,
+        maxZoom: 10,
+        gradient: {
+          0.0: 'blue',
+          0.25: 'cyan',
+          0.5: 'green',
+          0.75: 'yellow',
+          1.0: 'red'
+        }
+      });
+    } else {
+      // Update existing heatmap
+      const heatData = this.pmuData.map(pmu => {
+        const lat = pmu.latitude ?? pmu.Latitude;
+        const lon = pmu.longitude ?? pmu.Longitude;
+        const intensity = Math.abs(pmu.frequency - 60.0) * 100;
+        return [lat, lon, intensity];
+      });
+      
+      this.heatmapLayer.setLatLngs(heatData as [number, number, number][]);
+    }
   }
-}
 
   private updateVoltageContours(): void {
     this.voltageContoursLayer.clearLayers();
@@ -1053,7 +1069,7 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
         const color = voltage < 0.95 ? 'voltage-low' :
                      voltage > 1.05 ? 'voltage-high' : 'voltage-normal';
         
-        const rect = L.rectangle([
+        const rect = (L as any).rectangle([
           [lat, lng],
           [lat + latStep, lng + lngStep]
         ], {
@@ -1098,12 +1114,12 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
   private addCustomControls(): void {
     // Add zoom controls
-    L.control.zoom({
+    (L as any).control.zoom({
       position: 'bottomright'
     }).addTo(this.map);
     
     // Add scale
-    L.control.scale({
+    (L as any).control.scale({
       position: 'bottomleft',
       metric: true,
       imperial: true
@@ -1117,20 +1133,20 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   }
 
   private startRealtimeUpdates(): void {
-  this.updateInterval = setInterval(() => {
-    this.transmissionLines.forEach((line, id) => {
-      const lineData = this.transmissionData.find(l => l.id === id);
-      if (lineData && lineData.status === 'normal') {
-        // Animate power flow
-        const element = (line as any).getElement?.();
-        if (element && element.style) {
-          const currentOffset = parseInt(element.style.strokeDashoffset || '0');
-          element.style.strokeDashoffset = `${(currentOffset - 1) % 15}`;
+    this.updateInterval = setInterval(() => {
+      this.transmissionLines.forEach((line: any, id: string) => {
+        const lineData = this.transmissionData.find(l => l.id === id);
+        if (lineData && lineData.status === 'normal') {
+          // Animate power flow
+          const element = (line as any).getElement?.();
+          if (element && element.style) {
+            const currentOffset = parseInt(element.style.strokeDashoffset || '0');
+            element.style.strokeDashoffset = `${(currentOffset - 1) % 15}`;
+          }
         }
-      }
-    });
-  }, 100);
-}
+      });
+    }, 100);
+  }
 
   // Control methods
   toggleHeatmap(): void {
@@ -1150,14 +1166,14 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     if (!this.useClustering) {
       // Remove clustering
       this.markersLayer.clearLayers();
-      this.markers.forEach(marker => {
+      this.markers.forEach((marker: any) => {
         this.map.addLayer(marker);
       });
     } else {
       // Re-enable clustering
-      this.markers.forEach(marker => {
+      this.markers.forEach((marker: any) => {
         this.map.removeLayer(marker);
-        this.markersLayer.addLayer(marker);
+        this.markersLayer.addLayers([marker]);
       });
     }
   }
@@ -1182,17 +1198,18 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   }
 
   centerOnAlerts(): void {
-    const alertMarkers: L.Marker[] = [];
-    this.markers.forEach(marker => {
+    const alertPositions: any[] = [];
+    
+    this.markers.forEach((marker: any) => {
       const element = marker.getElement();
       if (element && (element.className.includes('alarm') || element.className.includes('warning'))) {
-        alertMarkers.push(marker);
+        alertPositions.push(marker.getLatLng());
       }
     });
     
-    if (alertMarkers.length > 0) {
-      const group = L.featureGroup(alertMarkers);
-      this.map.fitBounds(group.getBounds(), { padding: [50, 50] });
+    if (alertPositions.length > 0) {
+      const bounds = (L as any).latLngBounds(alertPositions);
+      this.map.fitBounds(bounds, { padding: [50, 50] });
     }
   }
 }

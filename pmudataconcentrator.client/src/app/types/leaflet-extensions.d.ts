@@ -12,13 +12,14 @@ declare module 'leaflet' {
     showCoverageOnHover?: boolean;
     zoomToBoundsOnClick?: boolean;
     maxClusterRadius?: number;
-    iconCreateFunction?: (cluster: any) => L.DivIcon;
+    iconCreateFunction?: (cluster: any) => Icon | DivIcon;
   }
   
   class MarkerClusterGroup extends FeatureGroup {
     constructor(options?: MarkerClusterGroupOptions);
     getChildCount(): number;
-    getAllChildMarkers(): L.Marker[];
+    getAllChildMarkers(): Marker[];
+    clearLayers(): this;
   }
   
   function markerClusterGroup(options?: MarkerClusterGroupOptions): MarkerClusterGroup;
@@ -36,10 +37,12 @@ declare module 'leaflet' {
   }
   
   function heatLayer(latlngs: number[][], options?: HeatLayerOptions): HeatLayer;
-}
-
-declare global {
-  interface Window {
-    L: typeof L;
+  
+  // Extend DivIcon interface
+  interface DivIconOptions {
+    className?: string;
+    html?: string | HTMLElement;
+    iconSize?: PointExpression;
+    iconAnchor?: PointExpression;
   }
 }

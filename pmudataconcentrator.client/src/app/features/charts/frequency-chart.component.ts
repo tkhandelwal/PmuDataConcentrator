@@ -119,46 +119,47 @@ export class FrequencyChartComponent implements OnInit, AfterViewInit, OnChanges
     this.updateChart();
   }
   
-  private updateChart(): void {
-    if (!this.chart || this.pmuData.length === 0) return;
-    
-    // Calculate system average frequency
-    const now = new Date();
-    const cutoff = new Date(now.getTime() - this.timeWindow * 1000);
-    
-    // Group data by timestamp
-    const dataByTime = new Map<number, number[]>();
-    
-    this.pmuData.forEach(pmu => {
-      const timestamp = new Date(pmu.timestamp).getTime();
-      if (timestamp > cutoff.getTime()) {
-        if (!dataByTime.has(timestamp)) {
-          dataByTime.set(timestamp, []);
-        }
-        dataByTime.get(timestamp)?.push(pmu.frequency || 60.0);
+  // Around line 153, change the updateChart method:
+private updateChart(): void {
+  if (!this.chart || this.pmuData.length === 0) return;
+  
+  // Calculate system average frequency
+  const now = new Date();
+  const cutoff = new Date(now.getTime() - this.timeWindow * 1000);
+  
+  // Group data by timestamp
+  const dataByTime = new Map<number, number[]>();
+  
+  this.pmuData.forEach(pmu => {
+    const timestamp = new Date(pmu.timestamp).getTime();
+    if (timestamp > cutoff.getTime()) {
+      if (!dataByTime.has(timestamp)) {
+        dataByTime.set(timestamp, []);
       }
-    });
-    
-    // Calculate averages
-    const chartData = Array.from(dataByTime.entries())
-      .map(([time, frequencies]) => ({
-        x: new Date(time),
-        y: frequencies.reduce((sum, f) => sum + f, 0) / frequencies.length
-      }))
-      .sort((a, b) => a.x.getTime() - b.x.getTime());
-    
-    // Update chart
-    this.chart.data.datasets = [{
-      label: 'System Frequency',
-      data: chartData,
-      borderColor: '#00d4ff',
-      backgroundColor: 'rgba(0, 212, 255, 0.1)',
-      borderWidth: 2,
-      pointRadius: 0,
-      tension: 0.2,
-      fill: true
-    }];
-    
-    this.chart.update('none');
-  }
+      dataByTime.get(timestamp)?.push(pmu.frequency || 60.0);
+    }
+  });
+  
+  // Calculate averages - Fix: convert to proper format
+  const chartData = Array.from(dataByTime.entries())
+    .map(([time, frequencies]) => ({
+      x: time, // Use timestamp as number for time scale
+      y: frequencies.reduce((sum, f) => sum + f, 0) / frequencies.length
+    }))
+    .sort((a, b) => a.x - b.x);
+  
+  // Update chart with proper type
+  this.chart.data.datasets = [{
+    label: 'System Frequency',
+    data: chartData as any, // Type assertion for Chart.js compatibility
+    borderColor: '#00d4ff',
+    backgroundColor: 'rgba(0, 212, 255, 0.1)',
+    borderWidth: 2,
+    pointRadius: 0,
+    tension: 0.2,
+    fill: true
+  }];
+  
+  this.chart.update('none');
+}
 }

@@ -849,12 +849,16 @@ export class FrequencyAnalysisComponent implements OnInit, AfterViewInit, OnDest
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: 'rgba(26, 26, 26, 0.95)',
-            callbacks: {
-              label: (context: any) => `${context.parsed.y.toFixed(3)} Hz/s`
-            }
-          }
-        },
+  mode: 'index' as const,
+  intersect: false,
+  backgroundColor: 'rgba(26, 26, 26, 0.95)',
+  titleColor: '#00d4ff',
+  callbacks: {
+    label: (context: any) => {
+      return `${context.parsed.y.toFixed(3)} Hz`;
+    }
+  }
+},
         scales: {
           x: {
             type: 'time',

@@ -214,6 +214,7 @@ export class PmuDataService {
     this.updateSystemState();
   }
 
+
   private normalizePmuData(data: any): PmuData {
     // Normalize both camelCase and PascalCase properties
     const normalized: PmuData = {
@@ -708,3 +709,8 @@ export class PmuDataService {
     return Math.sqrt(2 * H * Math.PI / (Pm - Pe));
   }
 }
+
+
+
+
+
