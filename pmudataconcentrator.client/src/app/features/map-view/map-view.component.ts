@@ -16,7 +16,7 @@ declare global {
 // Add type declarations for Leaflet extensions
 declare module 'leaflet' {
   export function heatLayer(latlngs: number[][], options?: any): any;
-  export const markerClusterGroup: any;
+  //export const markerClusterGroup: any;
 }
 
 interface TransmissionLine {
