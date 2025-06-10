@@ -315,13 +315,13 @@ interface Alert {
               Geographic Overview
               <div class="chip-filters">
                 <button mat-stroked-button 
-                        [class.active]="mapFilter() === 'all'" 
+                        [class.active]="mapFilter === 'all'" 
                         (click)="setMapFilter('all')">All</button>
                 <button mat-stroked-button 
-                        [class.active]="mapFilter() === 'alerts'" 
+                        [class.active]="mapFilter === 'alerts'" 
                         (click)="setMapFilter('alerts')">Alerts</button>
                 <button mat-stroked-button 
-                        [class.active]="mapFilter() === 'offline'" 
+                        [class.active]="mapFilter === 'offline'" 
                         (click)="setMapFilter('offline')">Offline</button>
               </div>
             </mat-card-title>
@@ -340,15 +340,15 @@ interface Alert {
         <!-- Map Options Menu -->
         <mat-menu #mapMenu="matMenu">
           <button mat-menu-item (click)="toggleMapLayer('transmission')">
-            <mat-icon>{{ mapLayers().transmission ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
+            <mat-icon>{{ mapLayers.transmission ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
             <span>Transmission Lines</span>
           </button>
           <button mat-menu-item (click)="toggleMapLayer('zones')">
-            <mat-icon>{{ mapLayers().zones ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
+            <mat-icon>{{ mapLayers.zones ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
             <span>Control Zones</span>
           </button>
           <button mat-menu-item (click)="toggleMapLayer('weather')">
-            <mat-icon>{{ mapLayers().weather ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
+            <mat-icon>{{ mapLayers.weather ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
             <span>Weather Overlay</span>
           </button>
         </mat-menu>
@@ -464,13 +464,13 @@ interface Alert {
               System Events
               <div class="chip-filters">
                 <button mat-stroked-button 
-                        [class.active]="eventFilter() === 'all'" 
+                        [class.active]="eventFilter === 'all'" 
                         (click)="setEventFilter('all')">All</button>
                 <button mat-stroked-button 
-                        [class.active]="eventFilter() === 'critical'" 
+                        [class.active]="eventFilter === 'critical'" 
                         (click)="setEventFilter('critical')">Critical</button>
                 <button mat-stroked-button 
-                        [class.active]="eventFilter() === 'unack'" 
+                        [class.active]="eventFilter === 'unack'" 
                         (click)="setEventFilter('unack')">Unack</button>
               </div>
             </mat-card-title>
@@ -1748,11 +1748,12 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
   
   toggleMapLayer(layer: keyof MapLayers): void {
-    this.mapLayers.update(layers => ({
-      ...layers,
-      [layer]: !layers[layer]
-    }));
-  }
+  const currentLayers = this.mapLayers();
+  this.mapLayers.set({
+    ...currentLayers,
+    [layer]: !currentLayers[layer]
+  });
+}
   
   expandChart(chartType: string): void {
     // Open chart in dialog or new route

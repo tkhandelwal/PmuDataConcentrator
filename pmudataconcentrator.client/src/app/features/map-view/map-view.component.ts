@@ -1,15 +1,94 @@
-import { Component, Input, Output, EventEmitter, OnInit, AfterViewInit, OnChanges, SimpleChanges } from '@angular/core';
+// pmudataconcentrator.client/src/app/features/map-view/map-view.component.ts
+import { Component, Input, Output, EventEmitter, OnInit, AfterViewInit, OnChanges, SimpleChanges, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { MatIconModule } from '@angular/material/icon'; // Add this import
 import * as L from 'leaflet';
+import 'leaflet.markercluster';
+import 'leaflet.heat';
+
+interface TransmissionLine {
+  id: string;
+  from: [number, number];
+  to: [number, number];
+  voltage: number;
+  loading: number;
+  status: 'normal' | 'overload' | 'outage';
+}
+
+interface VoltageContour {
+  lat: number;
+  lng: number;
+  voltage: number;
+}
 
 @Component({
   selector: 'app-map-view',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MatIconModule],
   template: `
-    <div id="pmu-map" class="map-container"></div>
+    <div class="map-wrapper">
+      <div id="pmu-map" class="map-container"></div>
+      
+      <!-- Map Controls -->
+      <div class="map-controls">
+        <button class="control-btn" (click)="toggleHeatmap()" [class.active]="showHeatmap">
+          <mat-icon>gradient</mat-icon>
+          <span>Heat Map</span>
+        </button>
+        <button class="control-btn" (click)="toggleClustering()" [class.active]="useClustering">
+          <mat-icon>hub</mat-icon>
+          <span>Clustering</span>
+        </button>
+        <button class="control-btn" (click)="toggleTransmissionLines()" [class.active]="showTransmissionLines">
+          <mat-icon>power</mat-icon>
+          <span>Grid Lines</span>
+        </button>
+        <button class="control-btn" (click)="toggleVoltageContours()" [class.active]="showVoltageContours">
+          <mat-icon>layers</mat-icon>
+          <span>Voltage Contours</span>
+        </button>
+        <button class="control-btn" (click)="centerOnAlerts()">
+          <mat-icon>warning</mat-icon>
+          <span>Show Alerts</span>
+        </button>
+      </div>
+      
+      <!-- Real-time Statistics Overlay -->
+      <div class="map-stats-overlay">
+        <div class="stat-item">
+          <span class="stat-label">Active PMUs</span>
+          <span class="stat-value">{{ activePmuCount }}/{{ totalPmuCount }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Avg Frequency</span>
+          <span class="stat-value">{{ avgFrequency | number:'1.3-3' }} Hz</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">System Load</span>
+          <span class="stat-value">{{ systemLoad | number:'1.0-0' }} MW</span>
+        </div>
+      </div>
+      
+      <!-- Zone Information Panel -->
+      <div class="zone-info-panel" *ngIf="selectedZone">
+        <h4>{{ selectedZone.name }}</h4>
+        <div class="zone-stats">
+          <p>Generation: {{ selectedZone.generation | number:'1.0-0' }} MW</p>
+          <p>Load: {{ selectedZone.load | number:'1.0-0' }} MW</p>
+          <p>Import/Export: {{ selectedZone.netExchange | number:'1.0-0' }} MW</p>
+          <p>Reserve Margin: {{ selectedZone.reserveMargin | number:'1.1-1' }}%</p>
+        </div>
+        <button class="close-btn" (click)="selectedZone = null">×</button>
+      </div>
+    </div>
   `,
   styles: [`
+    .map-wrapper {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
     .map-container {
       width: 100%;
       height: 100%;
@@ -19,32 +98,146 @@ import * as L from 'leaflet';
       position: relative;
     }
 
+    .map-controls {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 1000;
+    }
+
+    .control-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: rgba(26, 26, 26, 0.95);
+      border: 1px solid #333;
+      border-radius: 8px;
+      color: #999;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-size: 12px;
+      backdrop-filter: blur(10px);
+    }
+
+    .control-btn:hover {
+      background: rgba(0, 212, 255, 0.1);
+      border-color: #00d4ff;
+      color: #00d4ff;
+    }
+
+    .control-btn.active {
+      background: rgba(0, 212, 255, 0.2);
+      border-color: #00d4ff;
+      color: #00d4ff;
+      box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+    }
+
+    .map-stats-overlay {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(26, 26, 26, 0.95);
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 16px;
+      backdrop-filter: blur(10px);
+      z-index: 1000;
+    }
+
+    .stat-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+
+    .stat-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-value {
+      font-size: 16px;
+      font-weight: 600;
+      color: #00d4ff;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .zone-info-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(26, 26, 26, 0.95);
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 20px;
+      backdrop-filter: blur(10px);
+      z-index: 1001;
+      min-width: 250px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+
+    .zone-info-panel h4 {
+      margin: 0 0 16px 0;
+      color: #00d4ff;
+      font-size: 18px;
+    }
+
+    .zone-stats p {
+      margin: 8px 0;
+      font-size: 14px;
+      color: #e0e0e0;
+    }
+
+    .close-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: none;
+      border: none;
+      color: #999;
+      font-size: 24px;
+      cursor: pointer;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      transition: all 0.2s ease;
+    }
+
+    .close-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+
     :host ::ng-deep {
       .leaflet-tile-pane {
         filter: brightness(0.6) contrast(1.2) saturate(0.8);
       }
 
       .leaflet-control-zoom {
-        border: 1px solid #333;
-        box-shadow: none;
-      }
-
-      .leaflet-control-zoom a {
-        background-color: #1a1a1a;
-        color: #00d4ff;
-        border-bottom: 1px solid #333;
-      }
-
-      .leaflet-control-zoom a:hover {
-        background-color: #2a2a2a;
+        display: none;
       }
 
       .pmu-marker {
         background: radial-gradient(circle, #00d4ff 0%, #0099ff 100%);
         border: 2px solid #fff;
         border-radius: 50%;
-        width: 30px;
-        height: 30px;
+        width: 32px;
+        height: 32px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -54,6 +247,28 @@ import * as L from 'leaflet';
         box-shadow: 0 0 20px rgba(0, 212, 255, 0.8);
         transition: all 0.3s ease;
         cursor: pointer;
+        position: relative;
+      }
+
+      .pmu-marker::before {
+        content: '';
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: radial-gradient(circle, transparent, rgba(0, 212, 255, 0.3));
+        animation: radar-pulse 2s infinite;
+      }
+
+      @keyframes radar-pulse {
+        0% {
+          transform: scale(1);
+          opacity: 1;
+        }
+        100% {
+          transform: scale(2.5);
+          opacity: 0;
+        }
       }
 
       .pmu-marker:hover {
@@ -67,16 +282,34 @@ import * as L from 'leaflet';
         box-shadow: 0 0 20px rgba(255, 152, 0, 0.8);
       }
 
+      .pmu-marker.warning::before {
+        background: radial-gradient(circle, transparent, rgba(255, 152, 0, 0.3));
+      }
+
       .pmu-marker.alarm {
         background: radial-gradient(circle, #f44336 0%, #d32f2f 100%);
         box-shadow: 0 0 20px rgba(244, 67, 54, 0.8);
-        animation: pulse 1s infinite;
+        animation: alarm-flash 1s infinite;
       }
 
-      @keyframes pulse {
-        0% { transform: scale(1); opacity: 1; }
-        50% { transform: scale(1.1); opacity: 0.8; }
-        100% { transform: scale(1); opacity: 1; }
+      .pmu-marker.alarm::before {
+        background: radial-gradient(circle, transparent, rgba(244, 67, 54, 0.3));
+        animation: radar-pulse 1s infinite;
+      }
+
+      @keyframes alarm-flash {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
+      }
+
+      .pmu-marker.offline {
+        background: #666;
+        box-shadow: none;
+        opacity: 0.5;
+      }
+
+      .pmu-marker.offline::before {
+        display: none;
       }
 
       .leaflet-popup-content-wrapper {
@@ -86,6 +319,7 @@ import * as L from 'leaflet';
         border-radius: 12px;
         backdrop-filter: blur(10px);
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        max-width: 350px;
       }
 
       .leaflet-popup-tip {
@@ -95,6 +329,8 @@ import * as L from 'leaflet';
 
       .leaflet-popup-close-button {
         color: #999;
+        font-size: 20px;
+        padding: 8px;
       }
 
       .leaflet-popup-close-button:hover {
@@ -102,48 +338,216 @@ import * as L from 'leaflet';
       }
 
       .transmission-line {
-        stroke: #0099ff;
-        stroke-width: 2;
-        stroke-opacity: 0.4;
+        stroke-width: 3;
         fill: none;
-        filter: drop-shadow(0 0 3px #0099ff);
-        stroke-dasharray: 5, 10;
-        animation: flow 20s linear infinite;
+        stroke-linecap: round;
+        stroke-linejoin: round;
       }
 
-      @keyframes flow {
-        to {
-          stroke-dashoffset: -15;
-        }
+      .transmission-line.normal {
+        stroke: #00d4ff;
+        stroke-opacity: 0.6;
+        filter: drop-shadow(0 0 3px #00d4ff);
+      }
+
+      .transmission-line.overload {
+        stroke: #ff9800;
+        stroke-opacity: 0.8;
+        stroke-width: 4;
+        filter: drop-shadow(0 0 5px #ff9800);
+        animation: overload-pulse 2s infinite;
+      }
+
+      @keyframes overload-pulse {
+        0%, 100% { stroke-opacity: 0.8; }
+        50% { stroke-opacity: 0.4; }
+      }
+
+      .transmission-line.outage {
+        stroke: #f44336;
+        stroke-opacity: 0.9;
+        stroke-dasharray: 10, 5;
+        filter: drop-shadow(0 0 5px #f44336);
       }
 
       .transmission-line:hover {
-        stroke-opacity: 0.8;
+        stroke-width: 5;
+        stroke-opacity: 1;
+        cursor: pointer;
+      }
+
+      .voltage-contour {
+        fill-opacity: 0.3;
+        stroke-width: 1;
+        stroke-opacity: 0.5;
+      }
+
+      .voltage-low {
+        fill: #f44336;
+        stroke: #f44336;
+      }
+
+      .voltage-normal {
+        fill: #4caf50;
+        stroke: #4caf50;
+      }
+
+      .voltage-high {
+        fill: #ff9800;
+        stroke: #ff9800;
+      }
+
+      .control-zone {
+        fill-opacity: 0.1;
+        stroke: #00d4ff;
+        stroke-width: 2;
+        stroke-dasharray: 5, 5;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+
+      .control-zone:hover {
+        fill-opacity: 0.2;
         stroke-width: 3;
+      }
+
+      .leaflet-marker-cluster {
+        background: rgba(0, 212, 255, 0.2);
+        border: 2px solid #00d4ff;
+      }
+
+      .leaflet-marker-cluster div {
+        background: rgba(0, 212, 255, 0.8);
+        color: #fff;
+        font-weight: 600;
+      }
+
+      .leaflet-marker-cluster.alarm {
+        background: rgba(244, 67, 54, 0.2);
+        border-color: #f44336;
+      }
+
+      .leaflet-marker-cluster.alarm div {
+        background: rgba(244, 67, 54, 0.8);
       }
     }
   `]
 })
-export class MapViewComponent implements OnInit, AfterViewInit, OnChanges {
+export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDestroy {
   @Input() pmuData: any[] = [];
+  @Input() showTransmissionGrid: boolean = true;
+  @Input() showZones: boolean = false;
+  @Input() showWeather: boolean = false;
   @Output() pmuSelected = new EventEmitter<number>();
+  @Output() lineSelected = new EventEmitter<string>();
+  @Output() zoneSelected = new EventEmitter<string>();
   
   private map!: L.Map;
-  private markersLayer = new L.LayerGroup();
+  private markersLayer!: L.MarkerClusterGroup;
   private linesLayer = new L.LayerGroup();
+  private zonesLayer = new L.LayerGroup();
+  private heatmapLayer: any;
+  private voltageContoursLayer = new L.LayerGroup();
   private markers = new Map<number, L.Marker>();
+  private transmissionLines = new Map<string, L.Polyline>();
+  private updateInterval: any;
+  
+  // Control states
+  showHeatmap = false;
+  useClustering = true;
+  showTransmissionLines = true;
+  showVoltageContours = false;
+  
+  // Statistics
+  activePmuCount = 0;
+  totalPmuCount = 118;
+  avgFrequency = 60.0;
+  systemLoad = 0;
+  
+  // Selected zone info
+  selectedZone: any = null;
+  
+  // IEEE 118-bus transmission lines with realistic parameters
+  private readonly transmissionData: TransmissionLine[] = [
+    // Pacific Northwest Interconnections
+    { id: 'GC-CJ', from: [47.9560, -118.9819], to: [47.9951, -119.6296], voltage: 500, loading: 75, status: 'normal' },
+    { id: 'CJ-HAN', from: [47.9951, -119.6296], to: [46.4165, -119.4888], voltage: 500, loading: 82, status: 'normal' },
+    { id: 'HAN-JD', from: [46.4165, -119.4888], to: [45.7166, -120.6930], voltage: 500, loading: 68, status: 'normal' },
+    { id: 'JD-MCN', from: [45.7166, -120.6930], to: [45.9360, -119.2973], voltage: 500, loading: 71, status: 'normal' },
+    
+    // California Corridor
+    { id: 'DC-SO', from: [35.2110, -120.8560], to: [33.3689, -117.5556], voltage: 500, loading: 89, status: 'overload' },
+    { id: 'SO-PV', from: [33.3689, -117.5556], to: [33.3881, -112.8627], voltage: 500, loading: 77, status: 'normal' },
+    { id: 'PV-FC', from: [33.3881, -112.8627], to: [36.6868, -108.4826], voltage: 500, loading: 65, status: 'normal' },
+    
+    // Midwest Grid
+    { id: 'BY-QC', from: [42.1269, -89.2552], to: [41.7264, -90.3103], voltage: 765, loading: 91, status: 'overload' },
+    { id: 'QC-LS', from: [41.7264, -90.3103], to: [41.2434, -88.6709], voltage: 765, loading: 73, status: 'normal' },
+    
+    // Texas Interconnection
+    { id: 'CP-ST', from: [32.2987, -97.7853], to: [28.7954, -96.0413], voltage: 345, loading: 0, status: 'outage' },
+    
+    // Eastern Interconnection
+    { id: 'SQ-PB', from: [41.0897, -76.1474], to: [39.7589, -76.2692], voltage: 500, loading: 85, status: 'normal' },
+    { id: 'PB-SL', from: [39.7589, -76.2692], to: [39.4627, -75.5358], voltage: 500, loading: 79, status: 'normal' },
+    
+    // Inter-regional Ties
+    { id: 'WECC-SPP', from: [36.6868, -108.4826], to: [39.7392, -104.9903], voltage: 500, loading: 94, status: 'overload' },
+    { id: 'SPP-MISO', from: [39.7392, -104.9903], to: [41.8781, -87.6298], voltage: 765, loading: 76, status: 'normal' },
+    { id: 'MISO-PJM', from: [41.8781, -87.6298], to: [41.0897, -76.1474], voltage: 765, loading: 88, status: 'normal' },
+  ];
+  
+  // Control zones
+  private readonly controlZones = [
+    {
+      id: 'WECC',
+      name: 'Western Electricity Coordinating Council',
+      bounds: [[32, -124], [49, -102]],
+      generation: 185420,
+      load: 178950,
+      netExchange: 6470,
+      reserveMargin: 15.2
+    },
+    {
+      id: 'SPP',
+      name: 'Southwest Power Pool',
+      bounds: [[28, -104], [42, -90]],
+      generation: 98760,
+      load: 95230,
+      netExchange: 3530,
+      reserveMargin: 18.5
+    },
+    {
+      id: 'MISO',
+      name: 'Midcontinent ISO',
+      bounds: [[36, -95], [49, -82]],
+      generation: 142380,
+      load: 138640,
+      netExchange: 3740,
+      reserveMargin: 21.3
+    },
+    {
+      id: 'PJM',
+      name: 'PJM Interconnection',
+      bounds: [[36, -84], [42, -74]],
+      generation: 178920,
+      load: 172460,
+      netExchange: 6460,
+      reserveMargin: 16.8
+    },
+    {
+      id: 'ERCOT',
+      name: 'Electric Reliability Council of Texas',
+      bounds: [[25.5, -106], [36.5, -93.5]],
+      generation: 86540,
+      load: 84320,
+      netExchange: 2220,
+      reserveMargin: 12.1
+    }
+  ];
 
   ngOnInit(): void {
-    // Initialize Leaflet default icon
-    const iconRetinaUrl = 'assets/marker-icon-2x.png';
-    const iconUrl = 'assets/marker-icon.png';
-    const shadowUrl = 'assets/marker-shadow.png';
-    delete (L.Icon.Default.prototype as any)._getIconUrl;
-    L.Icon.Default.mergeOptions({
-      iconRetinaUrl,
-      iconUrl,
-      shadowUrl,
-    });
+    this.initializeIcons();
   }
 
   ngAfterViewInit(): void {
@@ -151,222 +555,640 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['pmuData'] && this.map) {
+    if (changes['pmuData'] && this.map && this.pmuData) {
       this.updateMarkers();
+      this.updateStatistics();
+      this.updateTransmissionLines();
+      if (this.showHeatmap) {
+        this.updateHeatmap();
+      }
+      if (this.showVoltageContours) {
+        this.updateVoltageContours();
+      }
     }
   }
 
+  ngOnDestroy(): void {
+    if (this.updateInterval) {
+      clearInterval(this.updateInterval);
+    }
+  }
+
+  private initializeIcons(): void {
+    // Initialize default Leaflet icons
+    const iconDefault = L.icon({
+      iconUrl: 'assets/marker-icon.png',
+      iconRetinaUrl: 'assets/marker-icon-2x.png',
+      shadowUrl: 'assets/marker-shadow.png',
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [1, -34],
+      tooltipAnchor: [16, -28],
+      shadowSize: [41, 41]
+    });
+    L.Marker.prototype.options.icon = iconDefault;
+  }
+
   private initializeMap(): void {
+    // Initialize map centered on USA
     this.map = L.map('pmu-map', {
-      center: [39.8283, -98.5795], // Center of USA
+      center: [39.8283, -98.5795],
       zoom: 4,
       zoomControl: true,
-      attributionControl: false
+      attributionControl: false,
+      preferCanvas: true
     });
 
-    // Dark tile layer
+    // Add dark tile layer
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       maxZoom: 19,
       subdomains: 'abcd'
     }).addTo(this.map);
 
+    // Initialize marker cluster group
+    this.markersLayer = L.markerClusterGroup({
+      chunkedLoading: true,
+      spiderfyOnMaxZoom: true,
+      showCoverageOnHover: false,
+      zoomToBoundsOnClick: true,
+      maxClusterRadius: 50,
+      iconCreateFunction: (cluster) => {
+        const childCount = cluster.getChildCount();
+        const markers = cluster.getAllChildMarkers();
+        const hasAlarm = markers.some(m => m.options.className?.includes('alarm'));
+        const hasWarning = markers.some(m => m.options.className?.includes('warning'));
+        
+        let className = 'leaflet-marker-cluster ';
+        if (hasAlarm) className += 'alarm';
+        else if (hasWarning) className += 'warning';
+        
+        return L.divIcon({
+          html: `<div><span>${childCount}</span></div>`,
+          className: className,
+          iconSize: L.point(40, 40)
+        });
+      }
+    });
+
+    // Add layers to map
+    this.zonesLayer.addTo(this.map);
     this.linesLayer.addTo(this.map);
+    this.voltageContoursLayer.addTo(this.map);
     this.markersLayer.addTo(this.map);
 
-    // Add transmission lines
-    this.addTransmissionLines();
+    // Initialize control zones
+    this.initializeControlZones();
+
+    // Initialize transmission lines
+    this.initializeTransmissionLines();
 
     // Add custom controls
     this.addCustomControls();
+
+    // Set up real-time updates
+    this.startRealtimeUpdates();
+
+    // Handle map events
+    this.map.on('click', () => {
+      this.selectedZone = null;
+    });
   }
 
-  private addTransmissionLines(): void {
-    const transmissionLines = [
-      { from: [47.6062, -122.3321], to: [45.5152, -122.6784] }, // Seattle-Portland
-      { from: [45.5152, -122.6784], to: [37.7749, -122.4194] }, // Portland-SF
-      { from: [37.7749, -122.4194], to: [34.0522, -118.2437] }, // SF-LA
-      { from: [34.0522, -118.2437], to: [33.4484, -112.0740] }, // LA-Phoenix
-      { from: [33.4484, -112.0740], to: [39.7392, -104.9903] }, // Phoenix-Denver
-      { from: [39.7392, -104.9903], to: [41.8781, -87.6298] }, // Denver-Chicago
-      { from: [41.8781, -87.6298], to: [42.3314, -83.0458] }, // Chicago-Detroit
-      { from: [42.3314, -83.0458], to: [40.7128, -74.0060] }, // Detroit-NYC
-      { from: [40.7128, -74.0060], to: [42.3601, -71.0589] }, // NYC-Boston
-      { from: [41.8781, -87.6298], to: [29.7604, -95.3698] }, // Chicago-Houston
-      { from: [29.7604, -95.3698], to: [25.7617, -80.1918] }, // Houston-Miami
-    ];
-
-    transmissionLines.forEach(line => {
-      const polyline = L.polyline([line.from, line.to] as L.LatLngTuple[], {
-        className: 'transmission-line'
+  private initializeControlZones(): void {
+    this.controlZones.forEach(zone => {
+      const bounds = L.latLngBounds(zone.bounds as L.LatLngBoundsLiteral);
+      const rect = L.rectangle(bounds, {
+        className: 'control-zone',
+        weight: 2,
+        interactive: true
       });
       
+      rect.on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
+        this.selectedZone = zone;
+        this.zoneSelected.emit(zone.id);
+      });
+      
+      rect.bindTooltip(zone.name, {
+        permanent: false,
+        direction: 'center'
+      });
+      
+      this.zonesLayer.addLayer(rect);
+    });
+  }
+
+  private initializeTransmissionLines(): void {
+    this.transmissionData.forEach(line => {
+      const polyline = L.polyline([line.from, line.to] as L.LatLngTuple[], {
+        className: `transmission-line ${line.status}`,
+        weight: 3,
+        interactive: true
+      });
+      
+      polyline.on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
+        this.showLineInfo(line);
+        this.lineSelected.emit(line.id);
+      });
+      
+      polyline.bindTooltip(this.createLineTooltip(line), {
+        permanent: false,
+        direction: 'center'
+      });
+      
+      this.transmissionLines.set(line.id, polyline);
       this.linesLayer.addLayer(polyline);
     });
   }
 
+  private createLineTooltip(line: TransmissionLine): string {
+    const statusIcon = line.status === 'outage' ? '⚠️' : 
+                      line.status === 'overload' ? '🔴' : '🟢';
+    return `
+      <div style="text-align: center;">
+        <strong>${line.id}</strong><br>
+        ${line.voltage} kV<br>
+        Loading: ${line.loading}%<br>
+        Status: ${statusIcon} ${line.status}
+      </div>
+    `;
+  }
+
+  private showLineInfo(line: TransmissionLine): void {
+    const content = `
+      <div style="padding: 15px;">
+        <h4 style="margin: 0 0 10px 0; color: #00d4ff;">Transmission Line ${line.id}</h4>
+        <table style="width: 100%;">
+          <tr>
+            <td>Voltage Level:</td>
+            <td style="text-align: right; font-weight: bold;">${line.voltage} kV</td>
+          </tr>
+          <tr>
+            <td>Current Loading:</td>
+            <td style="text-align: right; font-weight: bold; color: ${line.loading > 90 ? '#f44336' : line.loading > 80 ? '#ff9800' : '#4caf50'}">
+              ${line.loading}%
+            </td>
+          </tr>
+          <tr>
+            <td>Power Flow:</td>
+            <td style="text-align: right; font-weight: bold;">${(line.loading * line.voltage * 1.732 / 100).toFixed(0)} MW</td>
+          </tr>
+          <tr>
+            <td>Status:</td>
+            <td style="text-align: right; font-weight: bold; color: ${line.status === 'outage' ? '#f44336' : line.status === 'overload' ? '#ff9800' : '#4caf50'}">
+              ${line.status.toUpperCase()}
+            </td>
+          </tr>
+        </table>
+      </div>
+    `;
+    
+    const center = L.latLng(
+      (line.from[0] + line.to[0]) / 2,
+      (line.from[1] + line.to[1]) / 2
+    );
+    
+    L.popup()
+      .setLatLng(center)
+      .setContent(content)
+      .openOn(this.map);
+  }
+
   private updateMarkers(): void {
+    // Clear existing markers if not clustering
+    if (!this.useClustering) {
+      this.markersLayer.clearLayers();
+      this.markers.clear();
+    }
+
     this.pmuData.forEach(pmu => {
+      const lat = pmu.latitude ?? pmu.Latitude;
+      const lon = pmu.longitude ?? pmu.Longitude;
+      
+      if (lat === undefined || lon === undefined) {
+        return;
+      }
+
       if (!this.markers.has(pmu.pmuId)) {
         const marker = this.createPmuMarker(pmu);
         this.markers.set(pmu.pmuId, marker);
         this.markersLayer.addLayer(marker);
       } else {
-        // Update existing marker
-        const marker = this.markers.get(pmu.pmuId)!;
-        this.updateMarkerStatus(marker, pmu);
+        this.updateMarkerStatus(this.markers.get(pmu.pmuId)!, pmu);
       }
     });
   }
 
   private createPmuMarker(pmu: any): L.Marker {
-  // Handle both camelCase and PascalCase
-  const lat = pmu.latitude ?? pmu.Latitude;
-  const lon = pmu.longitude ?? pmu.Longitude;
-  const name = pmu.stationName ?? pmu.StationName ?? `PMU ${pmu.pmuId}`;
-  
-  if (lat === undefined || lon === undefined) {
-    console.error('Invalid PMU data - missing coordinates:', pmu);
-    // Return a default location if coordinates are missing
-    return L.marker([39.8283, -98.5795]); // Center of USA
+    const lat = pmu.latitude ?? pmu.Latitude;
+    const lon = pmu.longitude ?? pmu.Longitude;
+    const name = pmu.stationName ?? pmu.StationName ?? `PMU ${pmu.pmuId}`;
+    
+    const status = this.getPmuStatus(pmu);
+    const icon = L.divIcon({
+      className: `pmu-marker ${status}`,
+      html: `<span>${pmu.pmuId}</span>`,
+      iconSize: [32, 32],
+      iconAnchor: [16, 16]
+    });
+
+    const marker = L.marker([lat, lon], { 
+      icon,
+      className: status 
+    });
+    
+    marker.bindPopup(() => this.createEnhancedPopupContent(pmu), {
+      maxWidth: 350,
+      minWidth: 300,
+      className: 'pmu-popup'
+    });
+
+    marker.on('click', () => {
+      this.pmuSelected.emit(pmu.pmuId);
+      this.animateMarkerSelection(marker);
+    });
+
+    return marker;
   }
 
-  const icon = L.divIcon({
-    className: `pmu-marker ${this.getStatusClass(pmu)}`,
-    html: `<span>${pmu.pmuId}</span>`,
-    iconSize: [30, 30],
-    iconAnchor: [15, 15]
-  });
-
-  const marker = L.marker([lat, lon], { icon });
-  
-  marker.bindPopup(this.createPopupContent(pmu), {
-    maxWidth: 300,
-    minWidth: 250
-  });
-
-  marker.on('click', () => {
-    this.pmuSelected.emit(pmu.pmuId);
-  });
-
-  return marker;
-}
-
   private updateMarkerStatus(marker: L.Marker, pmu: any): void {
+    const status = this.getPmuStatus(pmu);
     const element = marker.getElement();
     if (element) {
-      element.className = `pmu-marker ${this.getStatusClass(pmu)}`;
+      element.className = `pmu-marker ${status}`;
       
-      // Update popup content
       const popup = marker.getPopup();
-      if (popup) {
-        popup.setContent(this.createPopupContent(pmu));
+      if (popup && popup.isOpen()) {
+        popup.setContent(this.createEnhancedPopupContent(pmu));
       }
     }
   }
 
-  private getStatusClass(pmu: any): string {
-    if (Math.abs(pmu.frequency - 60.0) > 0.5 || Math.abs(pmu.rocof) > 1.0) {
-      return 'alarm';
-    }
-    if (Math.abs(pmu.frequency - 60.0) > 0.2 || Math.abs(pmu.rocof) > 0.5) {
-      return 'warning';
-    }
+  private getPmuStatus(pmu: any): string {
+    const now = Date.now();
+    const timestamp = new Date(pmu.timestamp).getTime();
+    
+    if ((now - timestamp) > 5000) return 'offline';
+    if (Math.abs(pmu.frequency - 60.0) > 0.5 || Math.abs(pmu.rocof) > 1.0) return 'alarm';
+    if (Math.abs(pmu.frequency - 60.0) > 0.2 || Math.abs(pmu.rocof) > 0.5) return 'warning';
     return 'normal';
   }
 
-  private createPopupContent(pmu: any): string {
-  const status = this.getStatusClass(pmu);
-  const statusIcon = status === 'alarm' ? '🔴' : status === 'warning' ? '🟡' : '🟢';
-  const name = pmu.stationName ?? pmu.StationName ?? `PMU ${pmu.pmuId}`;
-  const freq = pmu.frequency ?? pmu.Frequency ?? 0;
-  const rocof = pmu.rocof ?? pmu.Rocof ?? 0;
-  
-  // Get voltage from phasors
-  let voltage = 0;
-  if (pmu.phasors && pmu.phasors.length > 0) {
-    const voltagePhasor = pmu.phasors[0];
-    voltage = (voltagePhasor.magnitude ?? voltagePhasor.Magnitude ?? 0) / 1000;
-  }
-  
-  return `
-    <div style="padding: 10px;">
-      <h3 style="margin: 0 0 10px 0; color: #00d4ff; font-size: 16px;">
-        ${statusIcon} ${name}
-      </h3>
-      <table style="width: 100%; font-size: 13px;">
-        <tr>
-          <td style="padding: 4px 0; color: #999;">Frequency:</td>
-          <td style="text-align: right; font-weight: bold; color: #fff;">
-            ${freq.toFixed(3)} Hz
-          </td>
-        </tr>
-        <tr>
-          <td style="padding: 4px 0; color: #999;">ROCOF:</td>
-          <td style="text-align: right; font-weight: bold; color: #fff;">
-            ${rocof.toFixed(3)} Hz/s
-          </td>
-        </tr>
-        <tr>
-          <td style="padding: 4px 0; color: #999;">Voltage:</td>
-          <td style="text-align: right; font-weight: bold; color: #fff;">
-            ${voltage.toFixed(1)} kV
-          </td>
-        </tr>
-        <tr>
-          <td style="padding: 4px 0; color: #999;">Status:</td>
-          <td style="text-align: right; font-weight: bold;">
-            <span style="color: ${status === 'alarm' ? '#f44336' : status === 'warning' ? '#ff9800' : '#4caf50'};">
-              ${status.toUpperCase()}
-            </span>
-          </td>
-        </tr>
-      </table>
-      <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #333;">
-        <small style="color: #666;">
-          Last Update: ${new Date(pmu.timestamp).toLocaleTimeString()}
-        </small>
-      </div>
-    </div>
-  `;
-}
-
-  private addCustomControls(): void {
-    const legend = L.Control.extend({
-      options: { position: 'topright' },
-      onAdd: () => {
-        const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
-        container.style.cssText = `
-          background: rgba(26, 26, 26, 0.9);
-          padding: 12px;
-          border-radius: 8px;
-          border: 1px solid #333;
-        `;
+  private createEnhancedPopupContent(pmu: any): string {
+    const status = this.getPmuStatus(pmu);
+    const statusIcon = status === 'offline' ? '⚫' :
+                      status === 'alarm' ? '🔴' : 
+                      status === 'warning' ? '🟡' : '🟢';
+    const name = pmu.stationName ?? pmu.StationName ?? `PMU ${pmu.pmuId}`;
+    const freq = pmu.frequency ?? pmu.Frequency ?? 0;
+    const rocof = pmu.rocof ?? pmu.Rocof ?? 0;
+    
+    // Get phasor data
+    let voltage = 0, angle = 0, current = 0;
+    if (pmu.phasors && pmu.phasors.length > 0) {
+      const voltagePhasor = pmu.phasors.find((p: any) => 
+        (p.type === 0 || p.Type === 0) && 
+        ((p.name || p.Name || '').startsWith('V'))
+      );
+      const currentPhasor = pmu.phasors.find((p: any) => 
+        (p.type === 1 || p.Type === 1) && 
+        ((p.name || p.Name || '').startsWith('I'))
+      );
+      
+      if (voltagePhasor) {
+        voltage = (voltagePhasor.magnitude ?? voltagePhasor.Magnitude ?? 0) / 1000;
+        angle = voltagePhasor.angle ?? voltagePhasor.Angle ?? 0;
+      }
+      if (currentPhasor) {
+        current = currentPhasor.magnitude ?? currentPhasor.Magnitude ?? 0;
+      }
+    }
+    
+    const apparentPower = voltage * current * 1.732 / 1000; // MVA
+    
+    return `
+      <div style="padding: 15px;">
+        <h3 style="margin: 0 0 15px 0; color: #00d4ff; font-size: 18px; display: flex; align-items: center; gap: 8px;">
+          ${statusIcon} ${name}
+        </h3>
         
-        container.innerHTML = `
-          <div style="color: #e0e0e0; font-size: 12px;">
-            <div style="margin-bottom: 8px; font-weight: bold; color: #00d4ff;">PMU Status</div>
-            <div style="display: flex; align-items: center; margin-bottom: 4px;">
-              <span style="width: 12px; height: 12px; background: #4caf50; border-radius: 50%; 
-                     display: inline-block; margin-right: 8px; box-shadow: 0 0 4px #4caf50;"></span>
-              Normal Operation
-            </div>
-            <div style="display: flex; align-items: center; margin-bottom: 4px;">
-              <span style="width: 12px; height: 12px; background: #ff9800; border-radius: 50%; 
-                     display: inline-block; margin-right: 8px; box-shadow: 0 0 4px #ff9800;"></span>
-              Warning
-            </div>
-            <div style="display: flex; align-items: center;">
-              <span style="width: 12px; height: 12px; background: #f44336; border-radius: 50%; 
-                     display: inline-block; margin-right: 8px; box-shadow: 0 0 4px #f44336;"></span>
-              Alarm
-            </div>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 15px;">
+          <div style="background: rgba(0, 212, 255, 0.1); padding: 10px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 20px; font-weight: bold; color: #00d4ff;">${freq.toFixed(3)}</div>
+            <div style="font-size: 11px; color: #999; text-transform: uppercase;">Hz</div>
           </div>
-        `;
+          <div style="background: rgba(0, 212, 255, 0.1); padding: 10px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 20px; font-weight: bold; color: ${Math.abs(rocof) > 0.5 ? '#ff9800' : '#00d4ff'};">${rocof.toFixed(3)}</div>
+            <div style="font-size: 11px; color: #999; text-transform: uppercase;">Hz/s</div>
+          </div>
+        </div>
         
-        return container;
+        <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+          <tr style="border-bottom: 1px solid #333;">
+            <td style="padding: 8px 0; color: #999;">Voltage:</td>
+            <td style="text-align: right; font-weight: bold; color: #fff;">
+              ${voltage.toFixed(1)} kV ∠${angle.toFixed(1)}°
+            </td>
+          </tr>
+          <tr style="border-bottom: 1px solid #333;">
+            <td style="padding: 8px 0; color: #999;">Current:</td>
+            <td style="text-align: right; font-weight: bold; color: #fff;">
+              ${current.toFixed(0)} A
+            </td>
+          </tr>
+          <tr style="border-bottom: 1px solid #333;">
+            <td style="padding: 8px 0; color: #999;">Power:</td>
+            <td style="text-align: right; font-weight: bold; color: #fff;">
+              ${apparentPower.toFixed(1)} MVA
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #999;">Status:</td>
+            <td style="text-align: right; font-weight: bold;">
+              <span style="color: ${status === 'alarm' ? '#f44336' : status === 'warning' ? '#ff9800' : status === 'offline' ? '#666' : '#4caf50'};">
+                ${status.toUpperCase()}
+              </span>
+            </td>
+          </tr>
+        </table>
+        
+        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #333;">
+          <div style="display: flex; justify-content: space-between; font-size: 11px; color: #666;">
+            <span>PMU ID: ${pmu.pmuId}</span>
+            <span>${new Date(pmu.timestamp).toLocaleTimeString()}</span>
+          </div>
+        </div>
+        
+        <div style="margin-top: 10px; display: flex; gap: 8px;">
+          <button onclick="window.pmuMapComponent.viewPmuDetails(${pmu.pmuId})" 
+                  style="flex: 1; padding: 8px; background: rgba(0, 212, 255, 0.2); border: 1px solid #00d4ff; 
+                         color: #00d4ff; border-radius: 4px; cursor: pointer; font-size: 12px;">
+            View Details
+          </button>
+          <button onclick="window.pmuMapComponent.viewPmuHistory(${pmu.pmuId})" 
+                  style="flex: 1; padding: 8px; background: rgba(0, 212, 255, 0.2); border: 1px solid #00d4ff; 
+                         color: #00d4ff; border-radius: 4px; cursor: pointer; font-size: 12px;">
+            History
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  private animateMarkerSelection(marker: L.Marker): void {
+    const element = marker.getElement();
+    if (element) {
+      element.style.transition = 'transform 0.3s ease';
+      element.style.transform = 'scale(1.5)';
+      setTimeout(() => {
+        element.style.transform = 'scale(1)';
+      }, 300);
+    }
+  }
+
+  private updateStatistics(): void {
+    this.activePmuCount = this.pmuData.filter(pmu => this.getPmuStatus(pmu) !== 'offline').length;
+    
+    if (this.pmuData.length > 0) {
+      const frequencies = this.pmuData.map(pmu => pmu.frequency || pmu.Frequency || 60);
+      this.avgFrequency = frequencies.reduce((sum, f) => sum + f, 0) / frequencies.length;
+      
+      // Calculate system load from phasor data
+      let totalPower = 0;
+      this.pmuData.forEach(pmu => {
+        if (pmu.phasors && pmu.phasors.length > 0) {
+          const vPhasor = pmu.phasors.find((p: any) => (p.type === 0 || p.Type === 0));
+          const iPhasor = pmu.phasors.find((p: any) => (p.type === 1 || p.Type === 1));
+          if (vPhasor && iPhasor) {
+            const v = (vPhasor.magnitude ?? vPhasor.Magnitude ?? 0) / 1000;
+            const i = iPhasor.magnitude ?? iPhasor.Magnitude ?? 0;
+            totalPower += v * i * 1.732 / 1000; // Convert to MW
+          }
+        }
+      });
+      this.systemLoad = totalPower;
+    }
+  }
+
+  private updateTransmissionLines(): void {
+    // Update line status based on PMU data
+    this.transmissionLines.forEach((line, id) => {
+      const lineData = this.transmissionData.find(l => l.id === id);
+      if (lineData) {
+        // Simulate loading changes
+        lineData.loading = Math.min(100, Math.max(0, lineData.loading + (Math.random() - 0.5) * 5));
+        
+        // Update line appearance based on loading
+        const newStatus = lineData.loading === 0 ? 'outage' :
+                         lineData.loading > 90 ? 'overload' : 'normal';
+        
+        if (newStatus !== lineData.status) {
+          lineData.status = newStatus;
+          line.setStyle({ className: `transmission-line ${newStatus}` });
+        }
+        
+        // Update tooltip
+        line.setTooltipContent(this.createLineTooltip(lineData));
+      }
+    });
+  }
+
+  private updateHeatmap(): void {
+    if (!this.heatmapLayer) {
+      // Initialize heatmap layer
+      const heatData = this.pmuData.map(pmu => {
+        const lat = pmu.latitude ?? pmu.Latitude;
+        const lon = pmu.longitude ?? pmu.Longitude;
+        const intensity = Math.abs(pmu.frequency - 60.0) * 100; // Scale frequency deviation
+        return [lat, lon, intensity];
+      });
+      
+      this.heatmapLayer = (L as any).heatLayer(heatData, {
+        radius: 50,
+        blur: 30,
+        maxZoom: 10,
+        gradient: {
+          0.0: 'blue',
+          0.25: 'cyan',
+          0.5: 'green',
+          0.75: 'yellow',
+          1.0: 'red'
+        }
+      });
+    } else {
+      // Update existing heatmap
+      const heatData = this.pmuData.map(pmu => {
+        const lat = pmu.latitude ?? pmu.Latitude;
+        const lon = pmu.longitude ?? pmu.Longitude;
+        const intensity = Math.abs(pmu.frequency - 60.0) * 100;
+        return [lat, lon, intensity];
+      });
+      
+      this.heatmapLayer.setLatLngs(heatData);
+    }
+  }
+
+  private updateVoltageContours(): void {
+    this.voltageContoursLayer.clearLayers();
+    
+    // Create voltage contour regions based on PMU data
+    const gridSize = 50; // Grid resolution
+    const bounds = this.map.getBounds();
+    const latStep = (bounds.getNorth() - bounds.getSouth()) / gridSize;
+    const lngStep = (bounds.getEast() - bounds.getWest()) / gridSize;
+    
+    // Interpolate voltage across grid
+    for (let i = 0; i < gridSize; i++) {
+      for (let j = 0; j < gridSize; j++) {
+        const lat = bounds.getSouth() + i * latStep;
+        const lng = bounds.getWest() + j * lngStep;
+        
+        const voltage = this.interpolateVoltage(lat, lng);
+        const color = voltage < 0.95 ? 'voltage-low' :
+                     voltage > 1.05 ? 'voltage-high' : 'voltage-normal';
+        
+        const rect = L.rectangle([
+          [lat, lng],
+          [lat + latStep, lng + lngStep]
+        ], {
+          className: `voltage-contour ${color}`,
+          weight: 0,
+          interactive: false
+        });
+        
+        this.voltageContoursLayer.addLayer(rect);
+      }
+    }
+  }
+
+  private interpolateVoltage(lat: number, lng: number): number {
+    // Simple inverse distance weighted interpolation
+    let sumVoltage = 0;
+    let sumWeight = 0;
+    
+    this.pmuData.forEach(pmu => {
+      const pmuLat = pmu.latitude ?? pmu.Latitude;
+      const pmuLng = pmu.longitude ?? pmu.Longitude;
+      
+      if (pmuLat && pmuLng && pmu.phasors && pmu.phasors.length > 0) {
+        const vPhasor = pmu.phasors.find((p: any) => (p.type === 0 || p.Type === 0));
+        if (vPhasor) {
+          const voltage = (vPhasor.magnitude ?? vPhasor.Magnitude ?? 1.0) / 
+                         ((pmu.nominalVoltage ?? 345000) / 1000); // Per unit
+          
+          const distance = Math.sqrt(
+            Math.pow(lat - pmuLat, 2) + Math.pow(lng - pmuLng, 2)
+          );
+          
+          const weight = 1 / (distance + 0.01); // Avoid division by zero
+          sumVoltage += voltage * weight;
+          sumWeight += weight;
+        }
       }
     });
     
-    new legend().addTo(this.map);
+    return sumWeight > 0 ? sumVoltage / sumWeight : 1.0;
+  }
+
+  private addCustomControls(): void {
+    // Add zoom controls
+    L.control.zoom({
+      position: 'bottomright'
+    }).addTo(this.map);
+    
+    // Add scale
+    L.control.scale({
+      position: 'bottomleft',
+      metric: true,
+      imperial: true
+    }).addTo(this.map);
+    
+    // Make component accessible globally for popup buttons
+    (window as any).pmuMapComponent = {
+      viewPmuDetails: (pmuId: number) => this.pmuSelected.emit(pmuId),
+      viewPmuHistory: (pmuId: number) => console.log('View history for PMU', pmuId)
+    };
+  }
+
+  private startRealtimeUpdates(): void {
+    // Update transmission line animations
+    this.updateInterval = setInterval(() => {
+      this.transmissionLines.forEach((line, id) => {
+        const lineData = this.transmissionData.find(l => l.id === id);
+        if (lineData && lineData.status === 'normal') {
+          // Animate power flow
+          const element = line.getElement();
+          if (element) {
+            const currentOffset = parseInt(element.style.strokeDashoffset || '0');
+            element.style.strokeDashoffset = `${(currentOffset - 1) % 15}`;
+          }
+        }
+      });
+    }, 100);
+  }
+
+  // Control methods
+  toggleHeatmap(): void {
+    this.showHeatmap = !this.showHeatmap;
+    if (this.showHeatmap) {
+      this.updateHeatmap();
+      if (this.heatmapLayer) {
+        this.map.addLayer(this.heatmapLayer);
+      }
+    } else if (this.heatmapLayer) {
+      this.map.removeLayer(this.heatmapLayer);
+    }
+  }
+
+  toggleClustering(): void {
+    this.useClustering = !this.useClustering;
+    if (!this.useClustering) {
+      // Remove clustering
+      this.markersLayer.clearLayers();
+      this.markers.forEach(marker => {
+        this.map.addLayer(marker);
+      });
+    } else {
+      // Re-enable clustering
+      this.markers.forEach(marker => {
+        this.map.removeLayer(marker);
+        this.markersLayer.addLayer(marker);
+      });
+    }
+  }
+
+  toggleTransmissionLines(): void {
+    this.showTransmissionLines = !this.showTransmissionLines;
+    if (this.showTransmissionLines) {
+      this.map.addLayer(this.linesLayer);
+    } else {
+      this.map.removeLayer(this.linesLayer);
+    }
+  }
+
+  toggleVoltageContours(): void {
+    this.showVoltageContours = !this.showVoltageContours;
+    if (this.showVoltageContours) {
+      this.updateVoltageContours();
+      this.map.addLayer(this.voltageContoursLayer);
+    } else {
+      this.map.removeLayer(this.voltageContoursLayer);
+    }
+  }
+
+  centerOnAlerts(): void {
+    const alertMarkers: L.Marker[] = [];
+    this.markers.forEach(marker => {
+      const element = marker.getElement();
+      if (element && (element.className.includes('alarm') || element.className.includes('warning'))) {
+        alertMarkers.push(marker);
+      }
+    });
+    
+    if (alertMarkers.length > 0) {
+      const group = L.featureGroup(alertMarkers);
+      this.map.fitBounds(group.getBounds(), { padding: [50, 50] });
+    }
   }
 }
