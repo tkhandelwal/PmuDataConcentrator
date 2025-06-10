@@ -1,0 +1,56 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36202.13 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "pmudataconcentrator.client", "pmudataconcentrator.client\pmudataconcentrator.client.esproj", "{A58EEA73-189B-BFA2-B0AF-A84FA24E92C5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PmuDataConcentrator.API", "PmuDataConcentrator.Server\PmuDataConcentrator.API.csproj", "{63FF5136-B62D-40E3-A7E4-CE945F8ABD03}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PmuDataConcentrator.Core", "PmuDataConcentrator.Core\PmuDataConcentrator.Core.csproj", "{EF2B1B07-6A91-46D0-84E9-3D4A32B7FC73}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PmuDataConcentrator.Infrastructure", "PmuDataConcentrator.Infrastructure\PmuDataConcentrator.Infrastructure.csproj", "{E34A4843-E8A9-4EF5-BDC2-246D5D992904}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PmuDataConcentrator.PMU", "PmuDataConcentrator.PMU\PmuDataConcentrator.PMU.csproj", "{8F6362C8-72E0-4D4A-85C8-E46F53527B37}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{8EC462FD-D22E-90A8-E5CE-7E832BA40C5D}"
+	ProjectSection(SolutionItems) = preProject
+		build.ps1 = build.ps1
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A58EEA73-189B-BFA2-B0AF-A84FA24E92C5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A58EEA73-189B-BFA2-B0AF-A84FA24E92C5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A58EEA73-189B-BFA2-B0AF-A84FA24E92C5}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{A58EEA73-189B-BFA2-B0AF-A84FA24E92C5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A58EEA73-189B-BFA2-B0AF-A84FA24E92C5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A58EEA73-189B-BFA2-B0AF-A84FA24E92C5}.Release|Any CPU.Deploy.0 = Release|Any CPU
+		{63FF5136-B62D-40E3-A7E4-CE945F8ABD03}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{63FF5136-B62D-40E3-A7E4-CE945F8ABD03}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{63FF5136-B62D-40E3-A7E4-CE945F8ABD03}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{63FF5136-B62D-40E3-A7E4-CE945F8ABD03}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EF2B1B07-6A91-46D0-84E9-3D4A32B7FC73}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EF2B1B07-6A91-46D0-84E9-3D4A32B7FC73}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EF2B1B07-6A91-46D0-84E9-3D4A32B7FC73}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EF2B1B07-6A91-46D0-84E9-3D4A32B7FC73}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E34A4843-E8A9-4EF5-BDC2-246D5D992904}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E34A4843-E8A9-4EF5-BDC2-246D5D992904}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E34A4843-E8A9-4EF5-BDC2-246D5D992904}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E34A4843-E8A9-4EF5-BDC2-246D5D992904}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8F6362C8-72E0-4D4A-85C8-E46F53527B37}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8F6362C8-72E0-4D4A-85C8-E46F53527B37}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8F6362C8-72E0-4D4A-85C8-E46F53527B37}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8F6362C8-72E0-4D4A-85C8-E46F53527B37}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {355575A2-B368-4EB0-BD6B-2EB318EF8C36}
+	EndGlobalSection
+EndGlobal

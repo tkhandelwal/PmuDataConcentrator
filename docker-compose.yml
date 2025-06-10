@@ -1,0 +1,42 @@
+﻿version: '3.8'
+
+services:
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: pmu-timescaledb
+    environment:
+      POSTGRES_DB: pmu_concentrator
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: yourpassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - timescale-data:/var/lib/postgresql/data
+    command: postgres -c shared_preload_libraries=timescaledb
+
+  redis:
+    image: redis:alpine
+    container_name: pmu-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pmu-api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__TimescaleDB=Host=timescaledb;Port=5432;Database=pmu_concentrator;Username=postgres;Password=yourpassword
+      - ConnectionStrings__Redis=redis:6379
+    ports:
+      - "5000:80"
+    depends_on:
+      - timescaledb
+      - redis
+
+volumes:
+  timescale-data:
+  redis-data:
