@@ -16,7 +16,6 @@ declare global {
 // Add type declarations for Leaflet extensions
 declare module 'leaflet' {
   export function heatLayer(latlngs: number[][], options?: any): any;
-  //export const markerClusterGroup: any;
 }
 
 interface TransmissionLine {
@@ -105,10 +104,25 @@ interface VoltageContour {
     .map-container {
       width: 100%;
       height: 100%;
-      min-height: 400px;
+      min-height: 300px;
+      max-height: 500px;
       border-radius: 8px;
       overflow: hidden;
       position: relative;
+    }
+
+    @media (max-width: 1200px) {
+      .map-container {
+        min-height: 250px;
+        max-height: 400px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .map-container {
+        min-height: 200px;
+        max-height: 300px;
+      }
     }
 
     .map-controls {
@@ -119,6 +133,14 @@ interface VoltageContour {
       flex-direction: column;
       gap: 8px;
       z-index: 1000;
+    }
+
+    @media (max-width: 768px) {
+      .map-controls {
+        top: 10px;
+        right: 10px;
+        gap: 4px;
+      }
     }
 
     .control-btn {
@@ -134,6 +156,19 @@ interface VoltageContour {
       transition: all 0.3s ease;
       font-size: 12px;
       backdrop-filter: blur(10px);
+      white-space: nowrap;
+    }
+
+    @media (max-width: 768px) {
+      .control-btn {
+        padding: 6px 10px;
+        font-size: 11px;
+        gap: 4px;
+      }
+      
+      .control-btn span {
+        display: none;
+      }
     }
 
     .control-btn:hover {
@@ -161,6 +196,15 @@ interface VoltageContour {
       z-index: 1000;
     }
 
+    @media (max-width: 768px) {
+      .map-stats-overlay {
+        bottom: 10px;
+        left: 10px;
+        padding: 12px;
+        font-size: 12px;
+      }
+    }
+
     .stat-item {
       display: flex;
       justify-content: space-between;
@@ -185,6 +229,12 @@ interface VoltageContour {
       font-weight: 600;
       color: #00d4ff;
       font-variant-numeric: tabular-nums;
+    }
+
+    @media (max-width: 768px) {
+      .stat-value {
+        font-size: 14px;
+      }
     }
 
     .zone-info-panel {
@@ -454,32 +504,38 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   @Output() pmuSelected = new EventEmitter<number>();
   @Output() lineSelected = new EventEmitter<string>();
   @Output() zoneSelected = new EventEmitter<string>();
-  
-  private map!: any; // Use any type for Leaflet map
-  private markersLayer!: any; // Use any type for MarkerClusterGroup
+
+  private map!: any;
+  private markersLayer!: any;
   private linesLayer: any;
   private zonesLayer: any;
   private heatmapLayer: any;
   private voltageContoursLayer: any;
-  private markers = new Map<number, any>(); // Use any for markers
-  private transmissionLines = new Map<string, any>(); // Use any for polylines
+  private markers = new Map<number, any>();
+  private transmissionLines = new Map<string, any>();
   private updateInterval: any;
-  
+  private animationFrame: any;
+
   // Control states
   showHeatmap = false;
   useClustering = true;
   showTransmissionLines = true;
   showVoltageContours = false;
-  
+
   // Statistics
   activePmuCount = 0;
   totalPmuCount = 118;
   avgFrequency = 60.0;
   systemLoad = 0;
-  
+
   // Selected zone info
   selectedZone: any = null;
-  
+
+  // Performance optimization
+  private updateThrottle: any;
+  private lastUpdateTime = 0;
+  private readonly UPDATE_INTERVAL = 1000; // Update every second
+
   // IEEE 118-bus transmission lines with realistic parameters
   private readonly transmissionData: TransmissionLine[] = [
     // Pacific Northwest Interconnections
@@ -487,29 +543,29 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     { id: 'CJ-HAN', from: [47.9951, -119.6296], to: [46.4165, -119.4888], voltage: 500, loading: 82, status: 'normal' },
     { id: 'HAN-JD', from: [46.4165, -119.4888], to: [45.7166, -120.6930], voltage: 500, loading: 68, status: 'normal' },
     { id: 'JD-MCN', from: [45.7166, -120.6930], to: [45.9360, -119.2973], voltage: 500, loading: 71, status: 'normal' },
-    
+
     // California Corridor
     { id: 'DC-SO', from: [35.2110, -120.8560], to: [33.3689, -117.5556], voltage: 500, loading: 89, status: 'overload' },
     { id: 'SO-PV', from: [33.3689, -117.5556], to: [33.3881, -112.8627], voltage: 500, loading: 77, status: 'normal' },
     { id: 'PV-FC', from: [33.3881, -112.8627], to: [36.6868, -108.4826], voltage: 500, loading: 65, status: 'normal' },
-    
+
     // Midwest Grid
     { id: 'BY-QC', from: [42.1269, -89.2552], to: [41.7264, -90.3103], voltage: 765, loading: 91, status: 'overload' },
     { id: 'QC-LS', from: [41.7264, -90.3103], to: [41.2434, -88.6709], voltage: 765, loading: 73, status: 'normal' },
-    
+
     // Texas Interconnection
     { id: 'CP-ST', from: [32.2987, -97.7853], to: [28.7954, -96.0413], voltage: 345, loading: 0, status: 'outage' },
-    
+
     // Eastern Interconnection
     { id: 'SQ-PB', from: [41.0897, -76.1474], to: [39.7589, -76.2692], voltage: 500, loading: 85, status: 'normal' },
     { id: 'PB-SL', from: [39.7589, -76.2692], to: [39.4627, -75.5358], voltage: 500, loading: 79, status: 'normal' },
-    
+
     // Inter-regional Ties
     { id: 'WECC-SPP', from: [36.6868, -108.4826], to: [39.7392, -104.9903], voltage: 500, loading: 94, status: 'overload' },
     { id: 'SPP-MISO', from: [39.7392, -104.9903], to: [41.8781, -87.6298], voltage: 765, loading: 76, status: 'normal' },
     { id: 'MISO-PJM', from: [41.8781, -87.6298], to: [41.0897, -76.1474], voltage: 765, loading: 88, status: 'normal' },
   ];
-  
+
   // Control zones
   private readonly controlZones = [
     {
@@ -576,14 +632,22 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['pmuData'] && this.map && this.pmuData) {
-      this.updateMarkers();
-      this.updateStatistics();
-      this.updateTransmissionLines();
-      if (this.showHeatmap) {
-        this.updateHeatmap();
-      }
-      if (this.showVoltageContours) {
-        this.updateVoltageContours();
+      // Throttle updates for performance
+      const now = Date.now();
+      if (now - this.lastUpdateTime > this.UPDATE_INTERVAL) {
+        this.lastUpdateTime = now;
+        clearTimeout(this.updateThrottle);
+        this.updateThrottle = setTimeout(() => {
+          this.updateMarkers();
+          this.updateStatistics();
+          this.updateTransmissionLines();
+          if (this.showHeatmap) {
+            this.updateHeatmap();
+          }
+          if (this.showVoltageContours) {
+            this.updateVoltageContours();
+          }
+        }, 100);
       }
     }
   }
@@ -592,6 +656,13 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     if (this.updateInterval) {
       clearInterval(this.updateInterval);
     }
+    if (this.animationFrame) {
+      cancelAnimationFrame(this.animationFrame);
+    }
+    if (this.updateThrottle) {
+      clearTimeout(this.updateThrottle);
+    }
+    this.map?.remove();
   }
 
   private initializeIcons(): void {
@@ -616,32 +687,40 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       zoom: 4,
       zoomControl: true,
       attributionControl: false,
-      preferCanvas: true
+      preferCanvas: true,
+      renderer: (L as any).canvas({ padding: 0.5 }) // Canvas renderer for better performance
     });
 
     // Add dark tile layer
     (L as any).tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       maxZoom: 19,
-      subdomains: 'abcd'
+      subdomains: 'abcd',
+      updateWhenIdle: true,
+      updateWhenZooming: false,
+      keepBuffer: 2
     }).addTo(this.map);
 
-    // Initialize marker cluster group
+    // Initialize marker cluster group with performance optimizations
     this.markersLayer = (L as any).markerClusterGroup({
       chunkedLoading: true,
       spiderfyOnMaxZoom: true,
       showCoverageOnHover: false,
       zoomToBoundsOnClick: true,
-      maxClusterRadius: 50,
+      maxClusterRadius: 60,
+      disableClusteringAtZoom: 10,
+      animate: false,
+      removeOutsideVisibleBounds: true,
+      spiderfyDistanceMultiplier: 2,
       iconCreateFunction: (cluster: any) => {
         const childCount = cluster.getChildCount();
         const markers = cluster.getAllChildMarkers();
         const hasAlarm = markers.some((m: any) => m.options.className?.includes('alarm'));
         const hasWarning = markers.some((m: any) => m.options.className?.includes('warning'));
-    
+
         let className = 'leaflet-marker-cluster ';
         if (hasAlarm) className += 'alarm';
         else if (hasWarning) className += 'warning';
-    
+
         return (L as any).divIcon({
           html: `<div><span>${childCount}</span></div>`,
           className: className,
@@ -672,6 +751,15 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     this.map.on('click', () => {
       this.selectedZone = null;
     });
+
+    // Optimize map interactions
+    this.map.on('zoomstart', () => {
+      this.map.options.updateWhenZooming = false;
+    });
+
+    this.map.on('zoomend', () => {
+      this.map.options.updateWhenZooming = true;
+    });
   }
 
   private initializeControlZones(): void {
@@ -682,18 +770,18 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
         weight: 2,
         interactive: true
       });
-      
+
       rect.on('click', (e: any) => {
         (L as any).DomEvent.stopPropagation(e);
         this.selectedZone = zone;
         this.zoneSelected.emit(zone.id);
       });
-      
+
       rect.bindTooltip(zone.name, {
         permanent: false,
         direction: 'center'
       });
-      
+
       this.zonesLayer.addLayer(rect);
     });
   }
@@ -705,26 +793,26 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
         weight: 3,
         interactive: true
       });
-      
+
       polyline.on('click', (e: any) => {
         (L as any).DomEvent.stopPropagation(e);
         this.showLineInfo(line);
         this.lineSelected.emit(line.id);
       });
-      
+
       polyline.bindTooltip(this.createLineTooltip(line), {
         permanent: false,
         direction: 'center'
       });
-      
+
       this.transmissionLines.set(line.id, polyline);
       this.linesLayer.addLayer(polyline);
     });
   }
 
   private createLineTooltip(line: TransmissionLine): string {
-    const statusIcon = line.status === 'outage' ? '⚠️' : 
-                      line.status === 'overload' ? '🔴' : '🟢';
+    const statusIcon = line.status === 'outage' ? '⚠️' :
+      line.status === 'overload' ? '🔴' : '🟢';
     return `
       <div style="text-align: center;">
         <strong>${line.id}</strong><br>
@@ -763,12 +851,12 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
         </table>
       </div>
     `;
-    
+
     const center = (L as any).latLng(
       (line.from[0] + line.to[0]) / 2,
       (line.from[1] + line.to[1]) / 2
     );
-    
+
     (L as any).popup()
       .setLatLng(center)
       .setContent(content)
@@ -776,16 +864,14 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   }
 
   private updateMarkers(): void {
-    // Clear existing markers if not clustering
-    if (!this.useClustering) {
-      this.markersLayer.clearLayers();
-      this.markers.clear();
-    }
+    // Batch marker updates for performance
+    const markersToAdd: any[] = [];
+    const markersToUpdate: Map<number, any> = new Map();
 
     this.pmuData.forEach(pmu => {
       const lat = pmu.latitude ?? pmu.Latitude;
       const lon = pmu.longitude ?? pmu.Longitude;
-      
+
       if (lat === undefined || lon === undefined) {
         return;
       }
@@ -793,9 +879,22 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       if (!this.markers.has(pmu.pmuId)) {
         const marker = this.createPmuMarker(pmu);
         this.markers.set(pmu.pmuId, marker);
-        this.markersLayer.addLayers([marker]);
+        markersToAdd.push(marker);
       } else {
-        this.updateMarkerStatus(this.markers.get(pmu.pmuId)!, pmu);
+        markersToUpdate.set(pmu.pmuId, pmu);
+      }
+    });
+
+    // Add new markers in batch
+    if (markersToAdd.length > 0) {
+      this.markersLayer.addLayers(markersToAdd);
+    }
+
+    // Update existing markers
+    markersToUpdate.forEach((pmu, pmuId) => {
+      const marker = this.markers.get(pmuId);
+      if (marker) {
+        this.updateMarkerStatus(marker, pmu);
       }
     });
   }
@@ -804,7 +903,7 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     const lat = pmu.latitude ?? pmu.Latitude;
     const lon = pmu.longitude ?? pmu.Longitude;
     const name = pmu.stationName ?? pmu.StationName ?? `PMU ${pmu.pmuId}`;
-    
+
     const status = this.getPmuStatus(pmu);
     const icon = (L as any).divIcon({
       className: `pmu-marker ${status}`,
@@ -813,11 +912,11 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       iconAnchor: [16, 16]
     });
 
-    const marker = (L as any).marker([lat, lon], { 
+    const marker = (L as any).marker([lat, lon], {
       icon,
-      className: status 
+      className: status
     });
-    
+
     marker.bindPopup(() => this.createEnhancedPopupContent(pmu), {
       maxWidth: 350,
       minWidth: 300,
@@ -837,7 +936,7 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     const element = marker.getElement();
     if (element) {
       element.className = `pmu-marker ${status}`;
-      
+
       const popup = marker.getPopup();
       if (popup && popup.isOpen()) {
         popup.setContent(this.createEnhancedPopupContent(pmu));
@@ -848,7 +947,7 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   private getPmuStatus(pmu: any): string {
     const now = Date.now();
     const timestamp = new Date(pmu.timestamp).getTime();
-    
+
     if ((now - timestamp) > 5000) return 'offline';
     if (Math.abs(pmu.frequency - 60.0) > 0.5 || Math.abs(pmu.rocof) > 1.0) return 'alarm';
     if (Math.abs(pmu.frequency - 60.0) > 0.2 || Math.abs(pmu.rocof) > 0.5) return 'warning';
@@ -858,24 +957,24 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   private createEnhancedPopupContent(pmu: any): string {
     const status = this.getPmuStatus(pmu);
     const statusIcon = status === 'offline' ? '⚫' :
-                      status === 'alarm' ? '🔴' : 
-                      status === 'warning' ? '🟡' : '🟢';
+      status === 'alarm' ? '🔴' :
+        status === 'warning' ? '🟡' : '🟢';
     const name = pmu.stationName ?? pmu.StationName ?? `PMU ${pmu.pmuId}`;
     const freq = pmu.frequency ?? pmu.Frequency ?? 0;
     const rocof = pmu.rocof ?? pmu.Rocof ?? 0;
-    
+
     // Get phasor data
     let voltage = 0, angle = 0, current = 0;
     if (pmu.phasors && pmu.phasors.length > 0) {
-      const voltagePhasor = pmu.phasors.find((p: any) => 
-        (p.type === 0 || p.Type === 0) && 
+      const voltagePhasor = pmu.phasors.find((p: any) =>
+        (p.type === 0 || p.Type === 0) &&
         ((p.name || p.Name || '').startsWith('V'))
       );
-      const currentPhasor = pmu.phasors.find((p: any) => 
-        (p.type === 1 || p.Type === 1) && 
+      const currentPhasor = pmu.phasors.find((p: any) =>
+        (p.type === 1 || p.Type === 1) &&
         ((p.name || p.Name || '').startsWith('I'))
       );
-      
+
       if (voltagePhasor) {
         voltage = (voltagePhasor.magnitude ?? voltagePhasor.Magnitude ?? 0) / 1000;
         angle = voltagePhasor.angle ?? voltagePhasor.Angle ?? 0;
@@ -884,9 +983,9 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
         current = currentPhasor.magnitude ?? currentPhasor.Magnitude ?? 0;
       }
     }
-    
+
     const apparentPower = voltage * current * 1.732 / 1000; // MVA
-    
+
     return `
       <div style="padding: 15px;">
         <h3 style="margin: 0 0 15px 0; color: #00d4ff; font-size: 18px; display: flex; align-items: center; gap: 8px;">
@@ -969,11 +1068,11 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
   private updateStatistics(): void {
     this.activePmuCount = this.pmuData.filter(pmu => this.getPmuStatus(pmu) !== 'offline').length;
-    
+
     if (this.pmuData.length > 0) {
       const frequencies = this.pmuData.map(pmu => pmu.frequency || pmu.Frequency || 60);
       this.avgFrequency = frequencies.reduce((sum, f) => sum + f, 0) / frequencies.length;
-      
+
       // Calculate system load from phasor data
       let totalPower = 0;
       this.pmuData.forEach(pmu => {
@@ -998,16 +1097,16 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       if (lineData) {
         // Simulate loading changes
         lineData.loading = Math.min(100, Math.max(0, lineData.loading + (Math.random() - 0.5) * 5));
-        
+
         // Update line appearance based on loading
         const newStatus = lineData.loading === 0 ? 'outage' :
-                         lineData.loading > 90 ? 'overload' : 'normal';
-        
+          lineData.loading > 90 ? 'overload' : 'normal';
+
         if (newStatus !== lineData.status) {
           lineData.status = newStatus;
           line.setStyle({ className: `transmission-line ${newStatus}` });
         }
-        
+
         // Update tooltip
         line.setTooltipContent(this.createLineTooltip(lineData));
       }
@@ -1023,7 +1122,7 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
         const intensity = Math.abs(pmu.frequency - 60.0) * 100;
         return [lat, lon, intensity];
       });
-      
+
       // Use L.heatLayer
       this.heatmapLayer = (L as any).heatLayer(heatData as [number, number, number][], {
         radius: 50,
@@ -1045,30 +1144,32 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
         const intensity = Math.abs(pmu.frequency - 60.0) * 100;
         return [lat, lon, intensity];
       });
-      
+
       this.heatmapLayer.setLatLngs(heatData as [number, number, number][]);
     }
   }
 
   private updateVoltageContours(): void {
     this.voltageContoursLayer.clearLayers();
-    
+
     // Create voltage contour regions based on PMU data
-    const gridSize = 50; // Grid resolution
+    const gridSize = 30; // Reduced grid resolution for performance
     const bounds = this.map.getBounds();
     const latStep = (bounds.getNorth() - bounds.getSouth()) / gridSize;
     const lngStep = (bounds.getEast() - bounds.getWest()) / gridSize;
-    
-    // Interpolate voltage across grid
+
+    // Batch contour creation
+    const contours: any[] = [];
+
     for (let i = 0; i < gridSize; i++) {
       for (let j = 0; j < gridSize; j++) {
         const lat = bounds.getSouth() + i * latStep;
         const lng = bounds.getWest() + j * lngStep;
-        
+
         const voltage = this.interpolateVoltage(lat, lng);
         const color = voltage < 0.95 ? 'voltage-low' :
-                     voltage > 1.05 ? 'voltage-high' : 'voltage-normal';
-        
+          voltage > 1.05 ? 'voltage-high' : 'voltage-normal';
+
         const rect = (L as any).rectangle([
           [lat, lng],
           [lat + latStep, lng + lngStep]
@@ -1077,38 +1178,41 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
           weight: 0,
           interactive: false
         });
-        
-        this.voltageContoursLayer.addLayer(rect);
+
+        contours.push(rect);
       }
     }
+
+    // Add all contours at once
+    this.voltageContoursLayer.addLayers(contours);
   }
 
   private interpolateVoltage(lat: number, lng: number): number {
     // Simple inverse distance weighted interpolation
     let sumVoltage = 0;
     let sumWeight = 0;
-    
+
     this.pmuData.forEach(pmu => {
       const pmuLat = pmu.latitude ?? pmu.Latitude;
       const pmuLng = pmu.longitude ?? pmu.Longitude;
-      
+
       if (pmuLat && pmuLng && pmu.phasors && pmu.phasors.length > 0) {
         const vPhasor = pmu.phasors.find((p: any) => (p.type === 0 || p.Type === 0));
         if (vPhasor) {
-          const voltage = (vPhasor.magnitude ?? vPhasor.Magnitude ?? 1.0) / 
-                         ((pmu.nominalVoltage ?? 345000) / 1000); // Per unit
-          
+          const voltage = (vPhasor.magnitude ?? vPhasor.Magnitude ?? 1.0) /
+            ((pmu.nominalVoltage ?? 345000) / 1000); // Per unit
+
           const distance = Math.sqrt(
             Math.pow(lat - pmuLat, 2) + Math.pow(lng - pmuLng, 2)
           );
-          
+
           const weight = 1 / (distance + 0.01); // Avoid division by zero
           sumVoltage += voltage * weight;
           sumWeight += weight;
         }
       }
     });
-    
+
     return sumWeight > 0 ? sumVoltage / sumWeight : 1.0;
   }
 
@@ -1117,14 +1221,14 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     (L as any).control.zoom({
       position: 'bottomright'
     }).addTo(this.map);
-    
+
     // Add scale
     (L as any).control.scale({
       position: 'bottomleft',
       metric: true,
       imperial: true
     }).addTo(this.map);
-    
+
     // Make component accessible globally for popup buttons
     (window as any).pmuMapComponent = {
       viewPmuDetails: (pmuId: number) => this.pmuSelected.emit(pmuId),
@@ -1133,7 +1237,8 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   }
 
   private startRealtimeUpdates(): void {
-    this.updateInterval = setInterval(() => {
+    // Use requestAnimationFrame for smooth animations
+    const animate = () => {
       this.transmissionLines.forEach((line: any, id: string) => {
         const lineData = this.transmissionData.find(l => l.id === id);
         if (lineData && lineData.status === 'normal') {
@@ -1145,7 +1250,22 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
           }
         }
       });
-    }, 100);
+
+      this.animationFrame = requestAnimationFrame(animate);
+    };
+
+    // Start animation only when visible
+    if (document.visibilityState === 'visible') {
+      animate();
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        animate();
+      } else {
+        cancelAnimationFrame(this.animationFrame);
+      }
+    });
   }
 
   // Control methods
@@ -1173,8 +1293,8 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       // Re-enable clustering
       this.markers.forEach((marker: any) => {
         this.map.removeLayer(marker);
-        this.markersLayer.addLayers([marker]);
       });
+      this.markersLayer.addLayers(Array.from(this.markers.values()));
     }
   }
 
@@ -1199,14 +1319,14 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
   centerOnAlerts(): void {
     const alertPositions: any[] = [];
-    
+
     this.markers.forEach((marker: any) => {
       const element = marker.getElement();
       if (element && (element.className.includes('alarm') || element.className.includes('warning'))) {
         alertPositions.push(marker.getLatLng());
       }
     });
-    
+
     if (alertPositions.length > 0) {
       const bounds = (L as any).latLngBounds(alertPositions);
       this.map.fitBounds(bounds, { padding: [50, 50] });

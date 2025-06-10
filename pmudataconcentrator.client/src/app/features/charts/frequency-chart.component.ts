@@ -1,7 +1,7 @@
-// pmudataconcentrator.client/src/app/features/charts/frequency-chart.component.ts
-import { Component, Input, OnInit, OnChanges, SimpleChanges, ViewChild, ElementRef, AfterViewInit, OnDestroy } from '@angular/core';
+import { Component, Input, OnInit, OnChanges, SimpleChanges, ViewChild, ElementRef, AfterViewInit, OnDestroy, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
+import 'chartjs-adapter-date-fns';
 
 Chart.register(...registerables);
 
@@ -9,60 +9,102 @@ Chart.register(...registerables);
   selector: 'app-frequency-chart',
   standalone: true,
   imports: [CommonModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="chart-container">
+    <div class="chart-wrapper">
       <canvas #frequencyChart></canvas>
+      <div class="chart-loading" *ngIf="!chartInitialized">
+        <span>Loading chart...</span>
+      </div>
     </div>
   `,
   styles: [`
-    .chart-container {
+    .chart-wrapper {
+      position: relative;
       width: 100%;
       height: 100%;
       min-height: 200px;
-      position: relative;
+    }
+    
+    canvas {
+      max-width: 100%;
+      max-height: 100%;
+    }
+    
+    .chart-loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.5);
+      color: #999;
     }
   `]
 })
-export class FrequencyChartComponent implements OnInit, AfterViewInit, OnChanges, OnDestroy {
-  @ViewChild('frequencyChart') chartCanvas!: ElementRef<HTMLCanvasElement>;
+export class FrequencyChartComponent implements AfterViewInit, OnChanges, OnDestroy {
+  @ViewChild('frequencyChart', { static: false }) chartCanvas!: ElementRef<HTMLCanvasElement>;
   @Input() pmuData: any[] = [];
-  @Input() timeWindow: number = 300; // seconds
-  
+  @Input() timeWindow: number = 300;
+
   private chart?: Chart;
-  
-  ngOnInit(): void {
-    // Component initialization
-  }
-  
+  chartInitialized = false;
+  private resizeObserver?: ResizeObserver;
+
   ngAfterViewInit(): void {
-    setTimeout(() => {
+    // Use requestAnimationFrame to ensure DOM is ready
+    requestAnimationFrame(() => {
       this.initializeChart();
-    }, 100);
+      this.setupResizeObserver();
+    });
   }
-  
+
   ngOnChanges(changes: SimpleChanges): void {
-    if (this.chart && (changes['pmuData'] || changes['timeWindow'])) {
+    if (this.chart && this.chartInitialized && (changes['pmuData'] || changes['timeWindow'])) {
       this.updateChart();
     }
   }
-  
+
   ngOnDestroy(): void {
+    this.resizeObserver?.disconnect();
     this.chart?.destroy();
   }
-  
+
+  private setupResizeObserver(): void {
+    if (this.chartCanvas?.nativeElement) {
+      this.resizeObserver = new ResizeObserver(() => {
+        this.chart?.resize();
+      });
+      this.resizeObserver.observe(this.chartCanvas.nativeElement);
+    }
+  }
+
   private initializeChart(): void {
+    if (!this.chartCanvas?.nativeElement) return;
+
     const ctx = this.chartCanvas.nativeElement.getContext('2d');
     if (!ctx) return;
-    
+
     const config: ChartConfiguration = {
       type: 'line',
       data: {
-        datasets: []
+        datasets: [{
+          label: 'System Frequency',
+          data: [],
+          borderColor: '#00d4ff',
+          backgroundColor: 'rgba(0, 212, 255, 0.1)',
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.2,
+          fill: true
+        }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        animation: false,
+        animation: {
+          duration: 0 // Disable animations for real-time data
+        },
         interaction: {
           mode: 'index',
           intersect: false
@@ -76,10 +118,11 @@ export class FrequencyChartComponent implements OnInit, AfterViewInit, OnChanges
             intersect: false,
             backgroundColor: 'rgba(26, 26, 26, 0.95)',
             titleColor: '#00d4ff',
+            bodyColor: '#e0e0e0',
+            borderColor: '#333',
+            borderWidth: 1,
             callbacks: {
-              label: (context: any) => {
-                return `${context.parsed.y.toFixed(3)} Hz`;
-              }
+              label: (context) => `${context.parsed.y.toFixed(3)} Hz`
             }
           }
         },
@@ -92,74 +135,86 @@ export class FrequencyChartComponent implements OnInit, AfterViewInit, OnChanges
                 minute: 'HH:mm'
               }
             },
-            grid: { 
-              color: 'rgba(255, 255, 255, 0.05)' 
+            grid: {
+              color: 'rgba(255, 255, 255, 0.05)',
             },
-            ticks: { 
+            ticks: {
               color: '#666',
-              maxTicksLimit: 8
+              maxTicksLimit: 8,
+              autoSkip: true
             }
           },
           y: {
             min: 59.5,
             max: 60.5,
-            grid: { 
-              color: 'rgba(255, 255, 255, 0.05)' 
+            grid: {
+              color: 'rgba(255, 255, 255, 0.05)',
             },
             ticks: {
               color: '#666',
-              callback: (value: any) => `${value} Hz`
+              callback: (value) => `${value} Hz`,
+              stepSize: 0.1
             }
           }
         }
       }
     };
-    
+
     this.chart = new Chart(ctx, config);
+    this.chartInitialized = true;
     this.updateChart();
   }
-  
-  // Around line 153, change the updateChart method:
-private updateChart(): void {
-  if (!this.chart || this.pmuData.length === 0) return;
-  
-  // Calculate system average frequency
-  const now = new Date();
-  const cutoff = new Date(now.getTime() - this.timeWindow * 1000);
-  
-  // Group data by timestamp
-  const dataByTime = new Map<number, number[]>();
-  
-  this.pmuData.forEach(pmu => {
-    const timestamp = new Date(pmu.timestamp).getTime();
-    if (timestamp > cutoff.getTime()) {
-      if (!dataByTime.has(timestamp)) {
-        dataByTime.set(timestamp, []);
+
+  private updateChart(): void {
+    if (!this.chart || !this.chartInitialized || this.pmuData.length === 0) return;
+
+    const now = new Date();
+    const cutoff = new Date(now.getTime() - this.timeWindow * 1000);
+
+    // Group and average data by timestamp
+    const dataMap = new Map<number, number[]>();
+
+    this.pmuData.forEach(pmu => {
+      if (!pmu.timestamp || !pmu.frequency) return;
+
+      const timestamp = new Date(pmu.timestamp).getTime();
+      if (timestamp > cutoff.getTime()) {
+        const roundedTime = Math.floor(timestamp / 1000) * 1000; // Round to nearest second
+
+        if (!dataMap.has(roundedTime)) {
+          dataMap.set(roundedTime, []);
+        }
+        dataMap.get(roundedTime)?.push(pmu.frequency);
       }
-      dataByTime.get(timestamp)?.push(pmu.frequency || 60.0);
+    });
+
+    // Calculate averages and create chart data
+    const chartData = Array.from(dataMap.entries())
+      .map(([time, frequencies]) => ({
+        x: time,
+        y: frequencies.reduce((sum, f) => sum + f, 0) / frequencies.length
+      }))
+      .sort((a, b) => a.x - b.x);
+
+    // Update chart
+    this.chart.data.datasets[0].data = chartData as any;
+
+    // Add reference line at 60Hz
+    if (!this.chart.data.datasets[1] && chartData.length > 0) {
+      this.chart.data.datasets.push({
+        label: 'Nominal',
+        data: [
+          { x: chartData[0].x, y: 60 },
+          { x: chartData[chartData.length - 1].x, y: 60 }
+        ] as any,
+        borderColor: 'rgba(255, 255, 255, 0.3)',
+        borderDash: [5, 5],
+        borderWidth: 1,
+        pointRadius: 0,
+        fill: false
+      });
     }
-  });
-  
-  // Calculate averages - Fix: convert to proper format
-  const chartData = Array.from(dataByTime.entries())
-    .map(([time, frequencies]) => ({
-      x: time, // Use timestamp as number for time scale
-      y: frequencies.reduce((sum, f) => sum + f, 0) / frequencies.length
-    }))
-    .sort((a, b) => a.x - b.x);
-  
-  // Update chart with proper type
-  this.chart.data.datasets = [{
-    label: 'System Frequency',
-    data: chartData as any, // Type assertion for Chart.js compatibility
-    borderColor: '#00d4ff',
-    backgroundColor: 'rgba(0, 212, 255, 0.1)',
-    borderWidth: 2,
-    pointRadius: 0,
-    tension: 0.2,
-    fill: true
-  }];
-  
-  this.chart.update('none');
-}
+
+    this.chart.update('none');
+  }
 }

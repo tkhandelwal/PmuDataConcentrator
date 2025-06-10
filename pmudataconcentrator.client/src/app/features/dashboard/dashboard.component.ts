@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy, signal, computed, effect, inject, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatGridListModule } from '@angular/material/grid-list';
 import { MatButtonModule } from '@angular/material/button';
@@ -155,6 +156,11 @@ interface Alert {
 
           <!-- Action Buttons -->
           <div class="action-buttons">
+            <button mat-button (click)="navigateToAnalytics()" class="analytics-btn">
+              <mat-icon>analytics</mat-icon>
+              Advanced Analytics
+            </button>
+
             <mat-button-toggle-group [(value)]="viewMode" aria-label="View mode">
               <mat-button-toggle value="grid" matTooltip="Grid View">
                 <mat-icon>grid_view</mat-icon>
@@ -314,16 +320,16 @@ interface Alert {
               <mat-icon>map</mat-icon>
               Geographic Overview
               <div class="chip-filters">
-  <button mat-stroked-button 
-          [class.active]="mapFilter() === 'all'" 
-          (click)="setMapFilter('all')">All</button>
-  <button mat-stroked-button 
-          [class.active]="mapFilter() === 'alerts'" 
-          (click)="setMapFilter('alerts')">Alerts</button>
-  <button mat-stroked-button 
-          [class.active]="mapFilter() === 'offline'" 
-          (click)="setMapFilter('offline')">Offline</button>
-</div>
+                <button mat-stroked-button 
+                        [class.active]="mapFilter() === 'all'" 
+                        (click)="setMapFilter('all')">All</button>
+                <button mat-stroked-button 
+                        [class.active]="mapFilter() === 'alerts'" 
+                        (click)="setMapFilter('alerts')">Alerts</button>
+                <button mat-stroked-button 
+                        [class.active]="mapFilter() === 'offline'" 
+                        (click)="setMapFilter('offline')">Offline</button>
+              </div>
             </mat-card-title>
             <button mat-icon-button [matMenuTriggerFor]="mapMenu" matTooltip="Map Options">
               <mat-icon>more_vert</mat-icon>
@@ -338,20 +344,20 @@ interface Alert {
         </mat-card>
 
         <!-- Map Options Menu -->
-<mat-menu #mapMenu="matMenu">
-  <button mat-menu-item (click)="toggleMapLayer('transmission')">
-    <mat-icon>{{ mapLayers().transmission ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
-    <span>Transmission Lines</span>
-  </button>
-  <button mat-menu-item (click)="toggleMapLayer('zones')">
-    <mat-icon>{{ mapLayers().zones ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
-    <span>Control Zones</span>
-  </button>
-  <button mat-menu-item (click)="toggleMapLayer('weather')">
-    <mat-icon>{{ mapLayers().weather ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
-    <span>Weather Overlay</span>
-  </button>
-</mat-menu>
+        <mat-menu #mapMenu="matMenu">
+          <button mat-menu-item (click)="toggleMapLayer('transmission')">
+            <mat-icon>{{ mapLayers().transmission ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
+            <span>Transmission Lines</span>
+          </button>
+          <button mat-menu-item (click)="toggleMapLayer('zones')">
+            <mat-icon>{{ mapLayers().zones ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
+            <span>Control Zones</span>
+          </button>
+          <button mat-menu-item (click)="toggleMapLayer('weather')">
+            <mat-icon>{{ mapLayers().weather ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
+            <span>Weather Overlay</span>
+          </button>
+        </mat-menu>
 
         <!-- Real-time Frequency Chart -->
         <mat-card class="dashboard-card frequency-card" @fadeIn>
@@ -463,16 +469,16 @@ interface Alert {
               </mat-icon>
               System Events
               <div class="chip-filters">
-  <button mat-stroked-button 
-          [class.active]="eventFilter() === 'all'" 
-          (click)="setEventFilter('all')">All</button>
-  <button mat-stroked-button 
-          [class.active]="eventFilter() === 'critical'" 
-          (click)="setEventFilter('critical')">Critical</button>
-  <button mat-stroked-button 
-          [class.active]="eventFilter() === 'unack'" 
-          (click)="setEventFilter('unack')">Unack</button>
-</div>
+                <button mat-stroked-button 
+                        [class.active]="eventFilter() === 'all'" 
+                        (click)="setEventFilter('all')">All</button>
+                <button mat-stroked-button 
+                        [class.active]="eventFilter() === 'critical'" 
+                        (click)="setEventFilter('critical')">Critical</button>
+                <button mat-stroked-button 
+                        [class.active]="eventFilter() === 'unack'" 
+                        (click)="setEventFilter('unack')">Unack</button>
+              </div>
             </mat-card-title>
             <button mat-icon-button (click)="acknowledgeAllEvents()" 
                     matTooltip="Acknowledge All" 
@@ -696,6 +702,20 @@ interface Alert {
       gap: 8px;
     }
 
+    .analytics-btn {
+      background: rgba(0, 212, 255, 0.1);
+      border: 1px solid rgba(0, 212, 255, 0.3);
+      color: #00d4ff;
+      padding: 8px 16px;
+      transition: all 0.3s ease;
+    }
+
+    .analytics-btn:hover {
+      background: rgba(0, 212, 255, 0.2);
+      border-color: #00d4ff;
+      box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+    }
+
     /* Alert Banner */
     .alert-banner {
       display: flex;
@@ -811,14 +831,14 @@ interface Alert {
       50% { opacity: 0.3; }
     }
 
-    /* Grid item sizes */
+    /* Grid item sizes - Updated for better layout */
     .system-overview-card { grid-column: span 12; grid-row: span 1; }
     .system-health-card { grid-column: span 3; grid-row: span 2; }
-    .map-card { grid-column: span 6; grid-row: span 4; }
+    .map-card { grid-column: span 6; grid-row: span 3; }
     .frequency-card { grid-column: span 3; grid-row: span 2; }
     .metrics-card { grid-column: span 3; grid-row: span 2; }
-    .events-card { grid-column: span 3; grid-row: span 2; }
-    .pmu-grid-card { grid-column: span 12; grid-row: span 3; }
+    .events-card { grid-column: span 3; grid-row: span 3; }
+    .pmu-grid-card { grid-column: span 12; grid-row: span 2; }
 
     /* Overview Grid */
     .overview-grid {
@@ -1129,13 +1149,24 @@ interface Alert {
       background-clip: text;
     }
 
-    /* Responsive Design */
+    /* Enhanced Responsive Design */
+    @media (max-width: 1920px) {
+      .dashboard-grid {
+        grid-template-columns: repeat(12, 1fr);
+      }
+    }
+
     @media (max-width: 1600px) {
+      .map-card { grid-column: span 8; grid-row: span 3; }
+      .events-card { grid-column: span 4; grid-row: span 3; }
+    }
+
+    @media (max-width: 1400px) {
       .dashboard-grid {
         grid-template-columns: repeat(8, 1fr);
       }
       .system-health-card { grid-column: span 4; }
-      .map-card { grid-column: span 8; }
+      .map-card { grid-column: span 8; grid-row: span 3; }
       .frequency-card { grid-column: span 4; }
       .metrics-card { grid-column: span 4; }
       .events-card { grid-column: span 4; }
@@ -1156,6 +1187,16 @@ interface Alert {
 
       .header-right {
         justify-content: space-between;
+        flex-wrap: wrap;
+      }
+
+      .action-buttons {
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .analytics-btn {
+        width: 100%;
       }
 
       .dashboard-grid {
@@ -1164,7 +1205,7 @@ interface Alert {
       
       .system-overview-card { grid-column: span 4; }
       .system-health-card { grid-column: span 4; }
-      .map-card { grid-column: span 4; }
+      .map-card { grid-column: span 4; grid-row: span 2; }
       .frequency-card { grid-column: span 4; }
       .metrics-card { grid-column: span 4; }
       .events-card { grid-column: span 4; }
@@ -1176,6 +1217,20 @@ interface Alert {
         padding: 12px;
       }
 
+      .dashboard-header {
+        padding: 16px;
+      }
+
+      .logo-icon {
+        font-size: 36px;
+        width: 36px;
+        height: 36px;
+      }
+
+      .header-left h1 {
+        font-size: 20px;
+      }
+
       .dashboard-grid {
         grid-template-columns: 1fr;
         gap: 12px;
@@ -1183,6 +1238,12 @@ interface Alert {
       
       .dashboard-card {
         grid-column: span 1 !important;
+        grid-row: auto !important;
+      }
+
+      .map-card mat-card-content {
+        min-height: 300px;
+        max-height: 400px;
       }
 
       .overview-grid {
@@ -1201,30 +1262,39 @@ interface Alert {
         grid-template-columns: 1fr;
       }
 
-      .action-buttons {
+      .chip-filters {
         flex-wrap: wrap;
       }
 
-      .chip-filters {
-        flex-wrap: wrap;
+      .pmu-summary {
+        display: none;
+      }
+
+      .pmu-controls {
+        flex-direction: column;
+        width: 100%;
+      }
+
+      .search-field {
+        width: 100%;
       }
     }
   `]
 })
 export class DashboardComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
-  
+
   // Inject services
   public pmuDataService = inject(PmuDataService);
   private snackBar = inject(MatSnackBar);
+  private router = inject(Router);
 
-  
   // View state
   viewMode = 'grid';
   chartTimeWindow = 300;
   pmuSearchTerm = '';
   pmuSortBy = 'id';
-  
+
   // Signals for reactive state
   isLoading = signal(false);
   isConnected = signal(false);
@@ -1236,7 +1306,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   isFullscreen = signal(false);
   isLiveData = signal(true);
   isExporting = signal(false);
-  
+
   // System metrics
   systemMetrics = signal<SystemMetrics>({
     avgFrequency: 60.0,
@@ -1248,7 +1318,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     phaseAngleSpread: 0,
     dataLatency: 0
   });
-  
+
   // PMU data
   pmuCount = signal(0);
   activePmuCount = signal(0);
@@ -1257,25 +1327,25 @@ export class DashboardComponent implements OnInit, OnDestroy {
   totalSamples = signal(0);
   frequencyTrend = signal(0);
   selectedPmuId = signal<number | null>(null);
-  
+
   // Events
   eventCount = signal(0);
   unacknowledgedEventCount = signal(0);
   recentEvents = signal<any[]>([]);
   eventFilter = signal<'all' | 'critical' | 'unack'>('all');
-  
+
   // Alerts
   activeAlerts = signal<Alert[]>([]);
   alertState = signal<'normal' | 'alert'>('normal');
-  
+
   // Map
   mapFilter = signal<'all' | 'alerts' | 'offline'>('all');
   mapLayers = signal<MapLayers>({
-  transmission: true,
-  zones: false,
-  weather: false
-});
-  
+    transmission: true,
+    zones: false,
+    weather: false
+  });
+
   // Alert thresholds
   private alertThresholds: AlertThresholds = {
     frequencyMin: 59.5,
@@ -1285,14 +1355,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
     voltageMax: 1.05,
     phaseAngleMax: 45
   };
-  
+
   // Computed values
   pmuDataList = computed(() => this.pmuDataService.pmuDataList());
-  
+
   filteredPmuData = computed(() => {
     const data = this.pmuDataList();
     const filter = this.mapFilter();
-    
+
     switch (filter) {
       case 'alerts':
         return data.filter(pmu => this.hasAlert(pmu));
@@ -1302,19 +1372,19 @@ export class DashboardComponent implements OnInit, OnDestroy {
         return data;
     }
   });
-  
+
   sortedFilteredPmuData = computed(() => {
     let data = this.pmuDataList();
-    
+
     // Apply search filter
     if (this.pmuSearchTerm) {
       const searchLower = this.pmuSearchTerm.toLowerCase();
-      data = data.filter(pmu => 
+      data = data.filter(pmu =>
         pmu.stationName?.toLowerCase().includes(searchLower) ||
         pmu.pmuId.toString().includes(searchLower)
       );
     }
-    
+
     // Apply sorting
     return [...data].sort((a, b) => {
       switch (this.pmuSortBy) {
@@ -1327,11 +1397,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
       }
     });
   });
-  
+
   filteredEvents = computed(() => {
     const events = this.recentEvents();
     const filter = this.eventFilter();
-    
+
     switch (filter) {
       case 'critical':
         return events.filter(e => e.severity === 2);
@@ -1341,7 +1411,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         return events;
     }
   });
-  
+
   // Math reference for template
   Math = Math;
 
@@ -1352,7 +1422,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.updateMetrics(data);
       this.checkAlerts(data);
     });
-    
+
     // Monitor connection status
     effect(() => {
       const connected = this.pmuDataList().length > 0;
@@ -1364,21 +1434,21 @@ export class DashboardComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     // Start loading
     this.isLoading.set(true);
-    
+
     // Update current time every second
     this.updateClock();
-    
+
     // Subscribe to real-time events
     this.subscribeToEvents();
-    
+
     // Simulate data updates
     this.simulateDataUpdates();
-    
+
     // Check for fullscreen changes
     document.addEventListener('fullscreenchange', () => {
       this.isFullscreen.set(!!document.fullscreenElement);
     });
-    
+
     // Initial data load
     setTimeout(() => {
       this.isLoading.set(false);
@@ -1389,7 +1459,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.destroy$.next();
     this.destroy$.complete();
   }
-  
+
   private updateClock(): void {
     interval(1000)
       .pipe(takeUntil(this.destroy$))
@@ -1406,7 +1476,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         }));
       });
   }
-  
+
   private subscribeToEvents(): void {
     this.pmuDataService.getEventStream()
       .pipe(takeUntil(this.destroy$))
@@ -1414,11 +1484,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
         const events = this.recentEvents();
         this.recentEvents.set([event, ...events].slice(0, 100));
         this.eventCount.set(this.eventCount() + 1);
-        
+
         if (!event.isAcknowledged) {
           this.unacknowledgedEventCount.update(count => count + 1);
         }
-        
+
         // Show notification for critical events
         if (event.severity === 2) {
           this.snackBar.open(`Critical Event: ${event.description}`, 'Acknowledge', {
@@ -1428,7 +1498,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         }
       });
   }
-  
+
   private simulateDataUpdates(): void {
     // Simulate frequency trend
     interval(5000)
@@ -1439,7 +1509,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
           this.frequencyTrend.set(trend);
         }
       });
-    
+
     // Simulate occasional alerts
     interval(30000)
       .pipe(takeUntil(this.destroy$))
@@ -1457,17 +1527,17 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private updateMetrics(pmuDataList: any[]): void {
     this.pmuCount.set(pmuDataList.length);
     this.activePmuCount.set(pmuDataList.filter(pmu => !this.isOffline(pmu)).length);
-    
+
     if (pmuDataList.length > 0) {
       // Calculate system metrics
       const frequencies = pmuDataList.map(pmu => pmu.frequency);
       const avgFreq = frequencies.reduce((sum, f) => sum + f, 0) / frequencies.length;
       const minFreq = Math.min(...frequencies);
       const maxFreq = Math.max(...frequencies);
-      
+
       const rocofs = pmuDataList.map(pmu => Math.abs(pmu.rocof));
       const avgRocof = rocofs.reduce((sum, r) => sum + r, 0) / rocofs.length;
-      
+
       // Calculate voltage stability (simplified)
       const voltages = pmuDataList.map(pmu => {
         const vPhasor = pmu.phasors?.find((p: any) => p.type === 0);
@@ -1475,7 +1545,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       });
       const avgVoltage = voltages.reduce((sum, v) => sum + v, 0) / voltages.length;
       const voltageStability = 100 - Math.abs(1.0 - avgVoltage) * 100;
-      
+
       // Calculate phase angle spread
       const angles = pmuDataList.map(pmu => {
         const vPhasor = pmu.phasors?.find((p: any) => p.type === 0);
@@ -1484,7 +1554,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       const minAngle = Math.min(...angles);
       const maxAngle = Math.max(...angles);
       const phaseAngleSpread = maxAngle - minAngle;
-      
+
       // Calculate data latency
       const latencies = pmuDataList.map(pmu => {
         const now = Date.now();
@@ -1492,7 +1562,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         return now - timestamp;
       });
       const avgLatency = latencies.reduce((sum, l) => sum + l, 0) / latencies.length;
-      
+
       this.systemMetrics.set({
         avgFrequency: avgFreq,
         avgRocof: avgRocof,
@@ -1503,30 +1573,30 @@ export class DashboardComponent implements OnInit, OnDestroy {
         phaseAngleSpread: phaseAngleSpread,
         dataLatency: avgLatency
       });
-      
+
       // Calculate data quality
       const goodQuality = pmuDataList.filter(pmu => pmu.quality === 0).length;
       this.dataQuality.set((goodQuality / pmuDataList.length) * 100);
-      
+
       // Update samples per second
       this.totalSamples.set(pmuDataList.length * this.updateRate());
     }
   }
-  
+
   private checkAlerts(pmuDataList: any[]): void {
     const metrics = this.systemMetrics();
     const alerts: Alert[] = [];
-    
+
     // Check frequency
     if (metrics.avgFrequency < this.alertThresholds.frequencyMin ||
-        metrics.avgFrequency > this.alertThresholds.frequencyMax) {
+      metrics.avgFrequency > this.alertThresholds.frequencyMax) {
       alerts.push({
         id: 'freq-1',
         message: `System frequency ${metrics.avgFrequency.toFixed(3)} Hz is outside normal range`,
         severity: 'critical'
       });
     }
-    
+
     // Check ROCOF
     if (metrics.avgRocof > this.alertThresholds.rocofMax) {
       alerts.push({
@@ -1535,7 +1605,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         severity: 'warning'
       });
     }
-    
+
     // Check phase angle
     if (metrics.phaseAngleSpread > this.alertThresholds.phaseAngleMax) {
       alerts.push({
@@ -1544,13 +1614,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
         severity: 'warning'
       });
     }
-    
+
     // Update alert state
     if (alerts.length > 0 && this.activeAlerts().length === 0) {
       this.alertState.set('alert');
       setTimeout(() => this.alertState.set('normal'), 500);
     }
-    
+
     // Only add new alerts
     const currentAlertIds = this.activeAlerts().map(a => a.id);
     const newAlerts = alerts.filter(a => !currentAlertIds.includes(a.id));
@@ -1558,61 +1628,61 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.activeAlerts.update(current => [...current, ...newAlerts]);
     }
   }
-  
+
   // Helper methods
   isSystemAlert(): boolean {
     const metrics = this.systemMetrics();
     return metrics.avgFrequency < 59.5 || metrics.avgFrequency > 60.5 ||
-           metrics.avgRocof > 1.0 || metrics.phaseAngleSpread > 45;
+      metrics.avgRocof > 1.0 || metrics.phaseAngleSpread > 45;
   }
-  
+
   getSystemStatus(): string {
     if (this.isSystemAlert()) return 'ALERT';
     if (this.systemMetrics().avgRocof > 0.5) return 'WARNING';
     return 'NORMAL';
   }
-  
+
   getSystemStatusIcon(): string {
     if (this.isSystemAlert()) return 'error';
     if (this.systemMetrics().avgRocof > 0.5) return 'warning';
     return 'check_circle';
   }
-  
+
   getSystemStatusColor(): string {
     if (this.isSystemAlert()) return '#f44336';
     if (this.systemMetrics().avgRocof > 0.5) return '#ff9800';
     return '#4caf50';
   }
-  
+
   getPmuAvailability(): number {
     return (this.activePmuCount() / this.totalPmuCount()) * 100;
   }
-  
+
   getDataThroughput(): string {
     const bytesPerSample = 200; // Approximate
     const throughput = this.totalSamples() * bytesPerSample / (1024 * 1024);
     return throughput.toFixed(2);
   }
-  
+
   getRocofPercentage(): number {
     const maxRocof = 2.0; // Maximum expected ROCOF
     return Math.min(100, (this.systemMetrics().avgRocof / maxRocof) * 100);
   }
-  
+
   getRocofSeverity(): 'primary' | 'accent' | 'warn' {
     const rocof = this.systemMetrics().avgRocof;
     if (rocof < 0.5) return 'primary';
     if (rocof < 1.0) return 'accent';
     return 'warn';
   }
-  
+
   getFrequencyPosition(): number {
     const metrics = this.systemMetrics();
     const range = metrics.maxFrequency - metrics.minFrequency;
     if (range === 0) return 50;
     return ((metrics.avgFrequency - metrics.minFrequency) / range) * 100;
   }
-  
+
   getPhaseAngleStatus(): string {
     const spread = this.systemMetrics().phaseAngleSpread;
     if (spread < 15) return 'STABLE';
@@ -1620,7 +1690,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     if (spread < 45) return 'WARNING';
     return 'CRITICAL';
   }
-  
+
   getLatencyStatus(): string {
     const latency = this.systemMetrics().dataLatency;
     if (latency < 50) return 'EXCELLENT';
@@ -1628,91 +1698,91 @@ export class DashboardComponent implements OnInit, OnDestroy {
     if (latency < 200) return 'FAIR';
     return 'POOR';
   }
-  
+
   getHealthyPmuCount(): number {
-    return this.pmuDataList().filter(pmu => 
+    return this.pmuDataList().filter(pmu =>
       !this.hasAlert(pmu) && !this.isOffline(pmu)
     ).length;
   }
-  
+
   getWarningPmuCount(): number {
-    return this.pmuDataList().filter(pmu => 
+    return this.pmuDataList().filter(pmu =>
       this.hasWarning(pmu) && !this.isOffline(pmu)
     ).length;
   }
-  
+
   getCriticalPmuCount(): number {
-    return this.pmuDataList().filter(pmu => 
+    return this.pmuDataList().filter(pmu =>
       this.hasCritical(pmu) && !this.isOffline(pmu)
     ).length;
   }
-  
+
   getOfflinePmuCount(): number {
     return this.totalPmuCount() - this.activePmuCount();
   }
-  
+
   hasAlert(pmu: any): boolean {
     return this.hasWarning(pmu) || this.hasCritical(pmu);
   }
-  
+
   hasWarning(pmu: any): boolean {
     return Math.abs(pmu.frequency - 60.0) > 0.2 || Math.abs(pmu.rocof) > 0.5;
   }
-  
+
   hasCritical(pmu: any): boolean {
     return Math.abs(pmu.frequency - 60.0) > 0.5 || Math.abs(pmu.rocof) > 1.0;
   }
-  
+
   isOffline(pmu: any): boolean {
     const now = Date.now();
     const timestamp = new Date(pmu.timestamp).getTime();
     return (now - timestamp) > 5000; // Offline if no data for 5 seconds
   }
-  
+
   getPmuStatus(pmu: any): number {
     if (this.isOffline(pmu)) return 0;
     if (this.hasCritical(pmu)) return 1;
     if (this.hasWarning(pmu)) return 2;
     return 3;
   }
-  
+
   // Event handlers
   onPmuSelected(pmuId: number): void {
     this.selectedPmuId.set(this.selectedPmuId() === pmuId ? null : pmuId);
   }
-  
-  onEventAcknowledged(eventId: string): void {  // Change parameter type to string
-  this.recentEvents.update(events => 
-    events.map(e => e.id === eventId ? { ...e, isAcknowledged: true } : e)
-  );
-  this.unacknowledgedEventCount.update(count => Math.max(0, count - 1));
-}
-  
+
+  onEventAcknowledged(eventId: string): void {
+    this.recentEvents.update(events =>
+      events.map(e => e.id === eventId ? { ...e, isAcknowledged: true } : e)
+    );
+    this.unacknowledgedEventCount.update(count => Math.max(0, count - 1));
+  }
+
   acknowledgeAllEvents(): void {
-    this.recentEvents.update(events => 
+    this.recentEvents.update(events =>
       events.map(e => ({ ...e, isAcknowledged: true }))
     );
     this.unacknowledgedEventCount.set(0);
-    
+
     this.snackBar.open('All events acknowledged', 'OK', {
       duration: 2000
     });
   }
-  
+
   toggleLiveData(): void {
     this.isLiveData.update(live => !live);
-    
+
     this.snackBar.open(
       this.isLiveData() ? 'Live updates resumed' : 'Live updates paused',
       'OK',
       { duration: 2000 }
     );
   }
-  
+
   toggleDarkMode(): void {
     this.isDarkMode.update(dark => !dark);
   }
-  
+
   toggleFullscreen(): void {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen();
@@ -1720,77 +1790,126 @@ export class DashboardComponent implements OnInit, OnDestroy {
       document.exitFullscreen();
     }
   }
-  
+
   exportData(): void {
     this.isExporting.set(true);
-    
-    // Simulate export
-    setTimeout(() => {
-      this.isExporting.set(false);
-      this.snackBar.open('Data exported successfully', 'Open', {
-        duration: 3000
-      }).onAction().subscribe(() => {
-        // Open exported file
-      });
-    }, 2000);
+
+    const data = this.pmuDataList().map(pmu => ({
+      timestamp: pmu.timestamp,
+      pmuId: pmu.pmuId,
+      stationName: pmu.stationName,
+      frequency: pmu.frequency,
+      rocof: pmu.rocof,
+      latitude: pmu.latitude,
+      longitude: pmu.longitude,
+      quality: pmu.quality,
+      status: this.getPmuStatus(pmu),
+      voltageMagnitude: pmu.phasors?.[0]?.magnitude || 0,
+      voltageAngle: pmu.phasors?.[0]?.angle || 0
+    }));
+
+    const csv = this.convertToCSV(data);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `pmu_data_export_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+
+    this.isExporting.set(false);
+    this.snackBar.open('Data exported successfully', 'OK', { duration: 2000 });
   }
-  
+
+  private convertToCSV(data: any[]): string {
+    if (!data.length) return '';
+
+    const headers = Object.keys(data[0]);
+    const csvHeaders = headers.join(',');
+
+    const csvRows = data.map(row => {
+      return headers.map(header => {
+        const value = row[header];
+        // Handle values that might contain commas or quotes
+        if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+          return `"${value.replace(/"/g, '""')}"`;
+        }
+        return value;
+      }).join(',');
+    });
+
+    return [csvHeaders, ...csvRows].join('\n');
+  }
+
   refreshHealth(): void {
     // Trigger health recalculation
     this.updateMetrics(this.pmuDataList());
   }
-  
+
   setMapFilter(filter: 'all' | 'alerts' | 'offline'): void {
     this.mapFilter.set(filter);
   }
-  
+
   setEventFilter(filter: 'all' | 'critical' | 'unack'): void {
     this.eventFilter.set(filter);
   }
-  
+
   toggleMapLayer(layer: keyof MapLayers): void {
-  const currentLayers = this.mapLayers();
-  this.mapLayers.set({
-    ...currentLayers,
-    [layer]: !currentLayers[layer]
-  });
-}
-  
+    const currentLayers = this.mapLayers();
+    this.mapLayers.set({
+      ...currentLayers,
+      [layer]: !currentLayers[layer]
+    });
+  }
+
   expandChart(chartType: string): void {
     // Open chart in dialog or new route
     console.log('Expanding chart:', chartType);
+    // TODO: Implement chart expansion in dialog
   }
-  
+
   openAlertSettings(): void {
     // Open alert settings dialog
     console.log('Opening alert settings');
+    // TODO: Implement alert settings dialog
   }
-  
+
   openDataSettings(): void {
     // Open data settings dialog
     console.log('Opening data settings');
+    // TODO: Implement data settings dialog
   }
-  
+
   showAbout(): void {
     // Show about dialog
-    this.snackBar.open('PMU Data Concentrator v1.0.0', 'OK', {
-      duration: 3000
-    });
+    this.snackBar.open(
+      'PMU Data Concentrator v1.0.0 - Wide Area Monitoring System',
+      'Close',
+      {
+        duration: 5000,
+        horizontalPosition: 'center',
+        verticalPosition: 'bottom'
+      }
+    );
   }
-  
+
   dismissAlert(alertId: string): void {
-    this.activeAlerts.update(alerts => 
+    this.activeAlerts.update(alerts =>
       alerts.filter(a => a.id !== alertId)
     );
   }
-  
+
   addAlert(alert: Alert): void {
     this.activeAlerts.update(alerts => [...alerts, alert]);
     this.alertState.set('alert');
     setTimeout(() => this.alertState.set('normal'), 500);
   }
-  
+
   trackByPmuId(index: number, pmu: any): number {
     return pmu.pmuId;
+  }
+
+  navigateToAnalytics(): void {
+    this.router.navigate(['/analytics']);
   }
 }

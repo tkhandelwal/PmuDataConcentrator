@@ -211,7 +211,7 @@ interface BusVoltage {
             <div class="pv-results">
               <div class="result-item">
                 <span>Critical Point:</span>
-                <strong>{{ criticalPoint.power | number:'1.0-0' }} MW @ {{ criticalPoint.voltage | number:'1.3-3' }} p.u.</strong>
+                  <strong>{{ criticalPoint.power | number:'1.0-0' }} MW &#64; {{ criticalPoint.voltage | number:'1.3-3' }} p.u.</strong>
               </div>
               <div class="result-item">
                 <span>Margin:</span>
@@ -861,11 +861,11 @@ export class VoltageStabilityComponent implements OnInit, AfterViewInit, OnDestr
   private initializePVCurve(): void {
     const ctx = this.pvCurveCanvas.nativeElement.getContext('2d');
     if (!ctx) return;
-    
+
     // Generate P-V curve data
     const powerData = [];
     const voltageData = [];
-    
+
     for (let p = 0; p <= 150; p += 5) {
       const power = p / 100 * 1000; // MW
       const voltage = this.calculateVoltageForPower(power);
@@ -888,7 +888,7 @@ export class VoltageStabilityComponent implements OnInit, AfterViewInit, OnDestr
           fill: true
         }, {
           label: 'Operating Point',
-          data: [{x: this.loadingLevel * 10, y: 0.95}],
+          data: [{ x: this.loadingLevel * 10, y: 0.95 } as any],  // Cast as any
           borderColor: '#4caf50',
           backgroundColor: '#4caf50',
           pointRadius: 8,
@@ -896,7 +896,7 @@ export class VoltageStabilityComponent implements OnInit, AfterViewInit, OnDestr
           showLine: false
         }, {
           label: 'Critical Point',
-          data: [{x: this.criticalPoint.power, y: this.criticalPoint.voltage}],
+          data: [{ x: this.criticalPoint.power, y: this.criticalPoint.voltage } as any],  // Cast as any
           borderColor: '#f44336',
           backgroundColor: '#f44336',
           pointRadius: 8,
@@ -1037,7 +1037,12 @@ export class VoltageStabilityComponent implements OnInit, AfterViewInit, OnDestr
     // Update VSI gauge
     if (this.vsiGaugeChart) {
       this.vsiGaugeChart.data.datasets[0].data = [this.currentVSI, 1 - this.currentVSI];
-      this.vsiGaugeChart.data.datasets[0].backgroundColor[0] = this.getGaugeColor(this.currentVSI);
+      // Fix the backgroundColor assignment
+      const backgroundColor = this.getGaugeColor(this.currentVSI);
+      (this.vsiGaugeChart.data.datasets[0].backgroundColor as any) = [
+        backgroundColor,
+        'rgba(255, 255, 255, 0.05)'
+      ];
       this.vsiGaugeChart.update('none');
     }
     

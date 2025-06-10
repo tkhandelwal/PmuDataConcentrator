@@ -15,6 +15,8 @@ import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { Subject, takeUntil, interval, firstValueFrom, Observable } from 'rxjs';
 import { filter, debounceTime, take } from 'rxjs/operators';
 import { PmuDataService } from '../../core/services/pmu-data.service';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
+
 
 Chart.register(...registerables);
 
@@ -50,7 +52,8 @@ interface SpectralComponent {
     MatSlideToggleModule,
     MatTableModule,
     MatSortModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    MatProgressBarModule
   ],
   template: `
     <div class="frequency-analysis-container">
@@ -828,7 +831,7 @@ export class FrequencyAnalysisComponent implements OnInit, AfterViewInit, OnDest
   private initializeRocofChart(): void {
     const ctx = this.rocofChartCanvas.nativeElement.getContext('2d');
     if (!ctx) return;
-    
+
     this.rocofChart = new Chart(ctx, {
       type: 'line',
       data: {
@@ -849,16 +852,17 @@ export class FrequencyAnalysisComponent implements OnInit, AfterViewInit, OnDest
         plugins: {
           legend: { display: false },
           tooltip: {
-  mode: 'index' as const,
-  intersect: false,
-  backgroundColor: 'rgba(26, 26, 26, 0.95)',
-  titleColor: '#00d4ff',
-  callbacks: {
-    label: (context: any) => {
-      return `${context.parsed.y.toFixed(3)} Hz`;
-    }
-  }
-},
+            mode: 'index',
+            intersect: false,
+            backgroundColor: 'rgba(26, 26, 26, 0.95)',
+            titleColor: '#00d4ff',
+            callbacks: {
+              label: (context: any) => {
+                return `${context.parsed.y.toFixed(3)} Hz/s`;
+              }
+            }
+          }
+        },
         scales: {
           x: {
             type: 'time',
@@ -1120,7 +1124,7 @@ export class FrequencyAnalysisComponent implements OnInit, AfterViewInit, OnDest
   
   private updateRocofChart(): void {
     if (!this.rocofChart) return;
-    
+
     const cutoff = new Date(Date.now() - this.timeWindow * 1000);
     const rocofData = this.rocofBuffer
       .filter(entry => entry.time > cutoff)
@@ -1129,8 +1133,9 @@ export class FrequencyAnalysisComponent implements OnInit, AfterViewInit, OnDest
         const avg = rocofs.reduce((sum, r) => sum + r, 0) / rocofs.length;
         return { x: entry.time, y: avg };
       });
-    
-    this.rocofChart.data.datasets[0].data = rocofData;
+
+    // Cast as any to bypass Chart.js type checking
+    (this.rocofChart.data.datasets[0].data as any) = rocofData;
     this.rocofChart.update('none');
   }
   
@@ -1253,26 +1258,26 @@ export class FrequencyAnalysisComponent implements OnInit, AfterViewInit, OnDest
   
   private updateOscillationChart(deviations: number[]): void {
     if (!this.oscillationChart) return;
-    
+
     const times = this.frequencyBuffer
       .slice(-deviations.length)
       .map(entry => entry.time);
-    
+
     const data = times.map((time, i) => ({
       x: time,
       y: deviations[i] * 1000 // Convert to mHz
     }));
-    
+
     this.oscillationChart.data.datasets = [{
       label: 'Frequency Deviation',
-      data,
+      data: data as any,  // Cast as any
       borderColor: '#ff9800',
       backgroundColor: 'rgba(255, 152, 0, 0.1)',
       borderWidth: 2,
       pointRadius: 0,
       tension: 0.1
     }];
-    
+
     this.oscillationChart.update('none');
   }
   
