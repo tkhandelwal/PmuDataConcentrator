@@ -111,7 +111,13 @@ export class FrequencyChartComponent implements AfterViewInit, OnChanges, OnDest
         },
         plugins: {
           legend: {
-            display: false
+            display: true,  // Change to true
+            labels: {
+              color: '#e0e0e0',  // Make sure text is visible
+              font: {
+                size: 12
+              }
+            }
           },
           tooltip: {
             mode: 'index',
@@ -136,10 +142,10 @@ export class FrequencyChartComponent implements AfterViewInit, OnChanges, OnDest
               }
             },
             grid: {
-              color: 'rgba(255, 255, 255, 0.05)',
+              color: 'rgba(255, 255, 255, 0.1)',
             },
             ticks: {
-              color: '#666',
+              color: '#e0e0e0',
               maxTicksLimit: 8,
               autoSkip: true
             }
@@ -148,7 +154,7 @@ export class FrequencyChartComponent implements AfterViewInit, OnChanges, OnDest
             min: 59.5,
             max: 60.5,
             grid: {
-              color: 'rgba(255, 255, 255, 0.05)',
+              color: 'rgba(255, 255, 255, 0.1)',
             },
             ticks: {
               color: '#666',

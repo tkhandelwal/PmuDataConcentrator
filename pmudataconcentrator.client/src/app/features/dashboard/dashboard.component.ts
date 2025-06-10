@@ -418,7 +418,7 @@ interface Alert {
                 </div>
                 <div class="metric-content">
                   <div class="metric-value">{{ systemMetrics().voltageStability | number:'1.1-1' }}%</div>
-                  <mat-progress-bar 
+                  <mat-progress-bar
                     mode="determinate" 
                     [value]="systemMetrics().voltageStability"
                     color="primary">

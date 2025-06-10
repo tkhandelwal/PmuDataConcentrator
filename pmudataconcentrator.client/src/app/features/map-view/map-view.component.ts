@@ -685,6 +685,13 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     this.map = (L as any).map('pmu-map', {
       center: [39.8283, -98.5795],
       zoom: 4,
+      minZoom: 3,  // Add minimum zoom
+      maxZoom: 10, // Add maximum zoom
+      maxBounds: [  // Add bounds to prevent panning too far
+        [-10, -180],  // Southwest coordinates
+        [85, -30]     // Northeast coordinates  
+      ],
+      maxBoundsViscosity: 1.0,  // How strong to snap back to bounds
       zoomControl: true,
       attributionControl: false,
       preferCanvas: true,
@@ -693,7 +700,8 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
     // Add dark tile layer
     (L as any).tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19,
+      maxZoom: 10,
+      minZoom: 3,
       subdomains: 'abcd',
       updateWhenIdle: true,
       updateWhenZooming: false,

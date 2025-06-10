@@ -83,6 +83,11 @@ export class PmuDataService {
   private reconnectAttempts = 0;
   private readonly maxReconnectAttempts = 10;
   private reconnectDelay = 1000; // ms
+
+  //Event Managegement
+  private eventThrottleMap = new Map<string, number>();
+  private readonly EVENT_THROTTLE_TIME = 30000; // 30 seconds between similar events
+  private readonly VOLTAGE_THRESHOLD_MARGIN = 0.02; // 2% margin to prevent flapping
   
   constructor(private http: HttpClient) {
     this.initializeSignalR();
@@ -279,55 +284,102 @@ export class PmuDataService {
 
   private detectAnomalies(pmuData: PmuData): void {
     const events: PowerSystemEvent[] = [];
-    
+    const now = Date.now();
+
     // Frequency anomalies
     const freqDev = Math.abs(pmuData.frequency - this.nominalFrequency);
     if (freqDev > 0.5) {
-      events.push({
-        id: `freq-${pmuData.pmuId}-${Date.now()}`,
-        timestamp: new Date(),
-        pmuId: pmuData.pmuId,
-        eventType: EventType.FrequencyDeviation,
-        severity: freqDev > 1.0 ? EventSeverity.Critical : EventSeverity.Warning,
-        description: `Frequency deviation: ${pmuData.frequency.toFixed(3)} Hz (${freqDev > 0 ? '+' : ''}${(freqDev).toFixed(3)} Hz)`,
-        isAcknowledged: false
-      });
+      const eventKey = `freq-${pmuData.pmuId}`;
+      if (this.shouldCreateEvent(eventKey, now)) {
+        events.push({
+          id: `${eventKey}-${now}`,
+          timestamp: new Date(),
+          pmuId: pmuData.pmuId,
+          eventType: EventType.FrequencyDeviation,
+          severity: freqDev > 1.0 ? EventSeverity.Critical : EventSeverity.Warning,
+          description: `Frequency deviation: ${pmuData.frequency.toFixed(3)} Hz (${freqDev > 0 ? '+' : ''}${(freqDev).toFixed(3)} Hz)`,
+          isAcknowledged: false
+        });
+      }
     }
-    
+
     // ROCOF anomalies
     if (Math.abs(pmuData.rocof) > this.rocofThreshold) {
-      events.push({
-        id: `rocof-${pmuData.pmuId}-${Date.now()}`,
-        timestamp: new Date(),
-        pmuId: pmuData.pmuId,
-        eventType: EventType.RapidFrequencyChange,
-        severity: Math.abs(pmuData.rocof) > 2.0 ? EventSeverity.Emergency : EventSeverity.Critical,
-        description: `High ROCOF detected: ${pmuData.rocof.toFixed(3)} Hz/s`,
-        isAcknowledged: false
-      });
+      const eventKey = `rocof-${pmuData.pmuId}`;
+      if (this.shouldCreateEvent(eventKey, now)) {
+        events.push({
+          id: `${eventKey}-${now}`,
+          timestamp: new Date(),
+          pmuId: pmuData.pmuId,
+          eventType: EventType.RapidFrequencyChange,
+          severity: Math.abs(pmuData.rocof) > 2.0 ? EventSeverity.Emergency : EventSeverity.Critical,
+          description: `High ROCOF detected: ${pmuData.rocof.toFixed(3)} Hz/s`,
+          isAcknowledged: false
+        });
+      }
     }
-    
-    // Voltage anomalies
+
+    // Voltage anomalies with hysteresis
     if (pmuData.phasors && pmuData.phasors.length > 0) {
       const voltagePhasor = pmuData.phasors.find(p => p.type === 0);
       if (voltagePhasor) {
         const voltagePU = voltagePhasor.magnitude / 345000;
-        if (voltagePU < 0.95 || voltagePU > 1.05) {
+        const eventKey = `voltage-${pmuData.pmuId}`;
+
+        // Check if we already have an active voltage event for this PMU
+        const hasActiveVoltageEvent = this.hasActiveVoltageEvent(pmuData.pmuId);
+
+        // Use different thresholds based on whether there's an active event (hysteresis)
+        const lowerThreshold = hasActiveVoltageEvent ? 0.95 + this.VOLTAGE_THRESHOLD_MARGIN : 0.95;
+        const upperThreshold = hasActiveVoltageEvent ? 1.05 - this.VOLTAGE_THRESHOLD_MARGIN : 1.05;
+
+        if ((voltagePU < lowerThreshold || voltagePU > upperThreshold) &&
+          this.shouldCreateEvent(eventKey, now)) {
           events.push({
-            id: `voltage-${pmuData.pmuId}-${Date.now()}`,
+            id: `${eventKey}-${now}`,
             timestamp: new Date(),
             pmuId: pmuData.pmuId,
             eventType: EventType.VoltageViolation,
             severity: voltagePU < 0.9 || voltagePU > 1.1 ? EventSeverity.Critical : EventSeverity.Warning,
-            description: `Voltage violation: ${voltagePU.toFixed(3)} p.u.`,
+            description: `Voltage violation: ${voltagePU.toFixed(3)} p.u. (${(voltagePU * 345).toFixed(1)} kV)`,
             isAcknowledged: false
           });
+
+          // Track active voltage event
+          this.setActiveVoltageEvent(pmuData.pmuId, true);
+        } else if (voltagePU >= lowerThreshold && voltagePU <= upperThreshold) {
+          // Clear active voltage event when voltage returns to normal
+          this.setActiveVoltageEvent(pmuData.pmuId, false);
         }
       }
     }
-    
+
     // Emit events
     events.forEach(event => this.eventSubject.next(event));
+  }
+
+  private shouldCreateEvent(eventKey: string, currentTime: number): boolean {
+    const lastEventTime = this.eventThrottleMap.get(eventKey) || 0;
+    if (currentTime - lastEventTime > this.EVENT_THROTTLE_TIME) {
+      this.eventThrottleMap.set(eventKey, currentTime);
+      return true;
+    }
+    return false;
+  }
+
+  // Track active voltage events to implement hysteresis
+  private activeVoltageEvents = new Set<number>();
+
+  private hasActiveVoltageEvent(pmuId: number): boolean {
+    return this.activeVoltageEvents.has(pmuId);
+  }
+
+  private setActiveVoltageEvent(pmuId: number, active: boolean): void {
+    if (active) {
+      this.activeVoltageEvents.add(pmuId);
+    } else {
+      this.activeVoltageEvents.delete(pmuId);
+    }
   }
 
   private updateSystemState(): void {

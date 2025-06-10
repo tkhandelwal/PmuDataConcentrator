@@ -12,6 +12,8 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { Subject, takeUntil } from 'rxjs';
 import { PmuDataService } from '../../core/services/pmu-data.service';
+import { FormsModule } from '@angular/forms';
+
 
 Chart.register(...registerables);
 
@@ -36,6 +38,7 @@ interface BusVoltage {
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     MatCardModule,
     MatButtonModule,
     MatIconModule,
@@ -193,7 +196,7 @@ interface BusVoltage {
                 min="0"
                 max="200"
                 step="10"
-                [(value)]="loadingLevel"
+                [(ngModel)]="loadingLevel"
                 thumbLabel>
               </mat-slider>
               <span>Loading: {{ loadingLevel }}%</span>
