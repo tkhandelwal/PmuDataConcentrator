@@ -6,6 +6,10 @@ import * as L from 'leaflet';
 import 'leaflet.markercluster';
 import 'leaflet.heat';
 
+declare module 'leaflet' {
+  export function heatLayer(latlngs: number[][], options?: any): any;
+}
+
 interface TransmissionLine {
   id: string;
   from: [number, number];
@@ -606,29 +610,29 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     }).addTo(this.map);
 
     // Initialize marker cluster group
-    this.markersLayer = L.markerClusterGroup({
-      chunkedLoading: true,
-      spiderfyOnMaxZoom: true,
-      showCoverageOnHover: false,
-      zoomToBoundsOnClick: true,
-      maxClusterRadius: 50,
-      iconCreateFunction: (cluster) => {
-        const childCount = cluster.getChildCount();
-        const markers = cluster.getAllChildMarkers();
-        const hasAlarm = markers.some(m => m.options.className?.includes('alarm'));
-        const hasWarning = markers.some(m => m.options.className?.includes('warning'));
-        
-        let className = 'leaflet-marker-cluster ';
-        if (hasAlarm) className += 'alarm';
-        else if (hasWarning) className += 'warning';
-        
-        return L.divIcon({
-          html: `<div><span>${childCount}</span></div>`,
-          className: className,
-          iconSize: L.point(40, 40)
-        });
-      }
-    });
+        this.markersLayer = L.markerClusterGroup({
+        chunkedLoading: true,
+        spiderfyOnMaxZoom: true,
+        showCoverageOnHover: false,
+        zoomToBoundsOnClick: true,
+        maxClusterRadius: 50,
+        iconCreateFunction: (cluster: any) => {
+          const childCount = cluster.getChildCount();
+          const markers = cluster.getAllChildMarkers();
+          const hasAlarm = markers.some((m: any) => m.options.className?.includes('alarm'));
+          const hasWarning = markers.some((m: any) => m.options.className?.includes('warning'));
+      
+          let className = 'leaflet-marker-cluster ';
+          if (hasAlarm) className += 'alarm';
+          else if (hasWarning) className += 'warning';
+      
+          return L.divIcon({
+            html: `<div><span>${childCount}</span></div>`,
+            className: className,
+            iconSize: L.point(40, 40)
+          });
+        }
+      });
 
     // Add layers to map
     this.zonesLayer.addTo(this.map);
@@ -995,39 +999,40 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   }
 
   private updateHeatmap(): void {
-    if (!this.heatmapLayer) {
-      // Initialize heatmap layer
-      const heatData = this.pmuData.map(pmu => {
-        const lat = pmu.latitude ?? pmu.Latitude;
-        const lon = pmu.longitude ?? pmu.Longitude;
-        const intensity = Math.abs(pmu.frequency - 60.0) * 100; // Scale frequency deviation
-        return [lat, lon, intensity];
-      });
-      
-      this.heatmapLayer = (L as any).heatLayer(heatData, {
-        radius: 50,
-        blur: 30,
-        maxZoom: 10,
-        gradient: {
-          0.0: 'blue',
-          0.25: 'cyan',
-          0.5: 'green',
-          0.75: 'yellow',
-          1.0: 'red'
-        }
-      });
-    } else {
-      // Update existing heatmap
-      const heatData = this.pmuData.map(pmu => {
-        const lat = pmu.latitude ?? pmu.Latitude;
-        const lon = pmu.longitude ?? pmu.Longitude;
-        const intensity = Math.abs(pmu.frequency - 60.0) * 100;
-        return [lat, lon, intensity];
-      });
-      
-      this.heatmapLayer.setLatLngs(heatData);
-    }
+  if (!this.heatmapLayer) {
+    // Initialize heatmap layer
+    const heatData = this.pmuData.map(pmu => {
+      const lat = pmu.latitude ?? pmu.Latitude;
+      const lon = pmu.longitude ?? pmu.Longitude;
+      const intensity = Math.abs(pmu.frequency - 60.0) * 100;
+      return [lat, lon, intensity];
+    });
+    
+    // Use L.heatLayer instead of (L as any).heatLayer
+    this.heatmapLayer = L.heatLayer(heatData as [number, number, number][], {
+      radius: 50,
+      blur: 30,
+      maxZoom: 10,
+      gradient: {
+        0.0: 'blue',
+        0.25: 'cyan',
+        0.5: 'green',
+        0.75: 'yellow',
+        1.0: 'red'
+      }
+    });
+  } else {
+    // Update existing heatmap
+    const heatData = this.pmuData.map(pmu => {
+      const lat = pmu.latitude ?? pmu.Latitude;
+      const lon = pmu.longitude ?? pmu.Longitude;
+      const intensity = Math.abs(pmu.frequency - 60.0) * 100;
+      return [lat, lon, intensity];
+    });
+    
+    this.heatmapLayer.setLatLngs(heatData as [number, number, number][]);
   }
+}
 
   private updateVoltageContours(): void {
     this.voltageContoursLayer.clearLayers();
@@ -1112,21 +1117,20 @@ export class MapViewComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   }
 
   private startRealtimeUpdates(): void {
-    // Update transmission line animations
-    this.updateInterval = setInterval(() => {
-      this.transmissionLines.forEach((line, id) => {
-        const lineData = this.transmissionData.find(l => l.id === id);
-        if (lineData && lineData.status === 'normal') {
-          // Animate power flow
-          const element = line.getElement();
-          if (element) {
-            const currentOffset = parseInt(element.style.strokeDashoffset || '0');
-            element.style.strokeDashoffset = `${(currentOffset - 1) % 15}`;
-          }
+  this.updateInterval = setInterval(() => {
+    this.transmissionLines.forEach((line, id) => {
+      const lineData = this.transmissionData.find(l => l.id === id);
+      if (lineData && lineData.status === 'normal') {
+        // Animate power flow
+        const element = (line as any).getElement?.();
+        if (element && element.style) {
+          const currentOffset = parseInt(element.style.strokeDashoffset || '0');
+          element.style.strokeDashoffset = `${(currentOffset - 1) % 15}`;
         }
-      });
-    }, 100);
-  }
+      }
+    });
+  }, 100);
+}
 
   // Control methods
   toggleHeatmap(): void {

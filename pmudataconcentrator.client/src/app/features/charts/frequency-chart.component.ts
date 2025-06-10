@@ -15,6 +15,9 @@ import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { Subject, takeUntil, interval } from 'rxjs';
 import { PmuDataService } from '../../core/services/pmu-data.service';
 
+import { Subject, takeUntil, interval, animationFrameScheduler, firstValueFrom, Observable } from 'rxjs';
+import { filter, debounceTime, take } from 'rxjs/operators';
+
 Chart.register(...registerables);
 
 interface FrequencyStatistics {
@@ -1302,19 +1305,29 @@ export class FrequencyAnalysisComponent implements OnInit, AfterViewInit, OnDest
     }
   }
   
-  async runModalAnalysis(): Promise<void> {
+  // In frequency-analysis.component.ts, add this helper:
+private async toPromise<T>(observable: Observable<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    observable.pipe(take(1)).subscribe({
+      next: (value) => resolve(value),
+      error: (err) => reject(err),
+      complete: () => reject(new Error('Observable completed without emitting'))
+    });
+  });
+}
+
+// Then update the runModalAnalysis method:
+async runModalAnalysis(): Promise<void> {
   this.isAnalyzing = true;
   
   try {
-    // Use firstValueFrom instead of toPromise()
-    const result = await firstValueFrom(this.pmuDataService.performModalAnalysis());
+    const result = await this.toPromise(this.pmuDataService.performModalAnalysis());
     console.log('Modal analysis result:', result);
     
-    // Process and display results
     if (result && result.modes) {
       this.spectralComponents = result.modes.map((mode: any) => ({
         frequency: mode.frequency,
-        amplitude: 0.01, // Placeholder
+        amplitude: 0.01,
         phase: 0,
         damping: mode.damping * 100
       }));
@@ -1371,6 +1384,16 @@ export class FrequencyAnalysisComponent implements OnInit, AfterViewInit, OnDest
     
     return csv;
   }
+
+  private async toPromise<T>(observable: Observable<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    observable.pipe(take(1)).subscribe({
+      next: (value) => resolve(value),
+      error: (err) => reject(err),
+      complete: () => reject(new Error('Observable completed without emitting'))
+    });
+  });
+}
   
   generateReport(): void {
     console.log('Generating frequency analysis report...');

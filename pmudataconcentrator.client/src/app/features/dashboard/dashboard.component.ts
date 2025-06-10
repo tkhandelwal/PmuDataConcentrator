@@ -1217,6 +1217,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   // Inject services
   public pmuDataService = inject(PmuDataService);
   private snackBar = inject(MatSnackBar);
+
   
   // View state
   viewMode = 'grid';
@@ -1680,12 +1681,12 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.selectedPmuId.set(this.selectedPmuId() === pmuId ? null : pmuId);
   }
   
-  onEventAcknowledged(eventId: string): void {
-    this.recentEvents.update(events => 
-      events.map(e => e.id === eventId ? { ...e, isAcknowledged: true } : e)
-    );
-    this.unacknowledgedEventCount.update(count => Math.max(0, count - 1));
-  }
+  onEventAcknowledged(eventId: string): void {  // Change parameter type to string
+  this.recentEvents.update(events => 
+    events.map(e => e.id === eventId ? { ...e, isAcknowledged: true } : e)
+  );
+  this.unacknowledgedEventCount.update(count => Math.max(0, count - 1));
+}
   
   acknowledgeAllEvents(): void {
     this.recentEvents.update(events => 

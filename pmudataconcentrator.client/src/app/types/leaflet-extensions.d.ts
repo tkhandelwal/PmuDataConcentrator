@@ -1,8 +1,12 @@
-// pmudataconcentrator.client/src/app/types/leaflet-extensions.d.ts
-declare module 'leaflet.markercluster' {
-  import * as L from 'leaflet';
+import * as L from 'leaflet';
+
+declare module 'leaflet' {
+  namespace control {
+    function zoom(options?: Control.ZoomOptions): Control.Zoom;
+    function scale(options?: Control.ScaleOptions): Control.Scale;
+  }
   
-  interface MarkerClusterGroupOptions extends L.LayerOptions {
+  interface MarkerClusterGroupOptions extends LayerOptions {
     chunkedLoading?: boolean;
     spiderfyOnMaxZoom?: boolean;
     showCoverageOnHover?: boolean;
@@ -11,13 +15,13 @@ declare module 'leaflet.markercluster' {
     iconCreateFunction?: (cluster: any) => L.DivIcon;
   }
   
-  export class MarkerClusterGroup extends L.FeatureGroup {
+  class MarkerClusterGroup extends FeatureGroup {
     constructor(options?: MarkerClusterGroupOptions);
+    getChildCount(): number;
+    getAllChildMarkers(): L.Marker[];
   }
-}
-
-declare module 'leaflet.heat' {
-  import * as L from 'leaflet';
+  
+  function markerClusterGroup(options?: MarkerClusterGroupOptions): MarkerClusterGroup;
   
   interface HeatLayerOptions {
     radius?: number;
@@ -26,5 +30,16 @@ declare module 'leaflet.heat' {
     gradient?: { [key: number]: string };
   }
   
-  export function heatLayer(latlngs: number[][], options?: HeatLayerOptions): L.Layer;
+  interface HeatLayer extends Layer {
+    setLatLngs(latlngs: number[][]): this;
+    addLatLng(latlng: number[]): this;
+  }
+  
+  function heatLayer(latlngs: number[][], options?: HeatLayerOptions): HeatLayer;
+}
+
+declare global {
+  interface Window {
+    L: typeof L;
+  }
 }
