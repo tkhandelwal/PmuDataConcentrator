@@ -337,7 +337,7 @@ export class GlobeViewComponent implements OnInit, OnDestroy {
     ];
 
     // Subscribe to PMU data
-    this.pmuDataService.pmuDataList()
+    this.pmuDataService.getPmuDataObservable()
       .pipe(takeUntil(this.destroy$))
       .subscribe(data => {
         this.updatePmuData(data);

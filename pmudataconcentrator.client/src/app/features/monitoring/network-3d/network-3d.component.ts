@@ -9,6 +9,7 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Subject, takeUntil } from 'rxjs';
 import { PmuDataService } from '../../../core/services/pmu-data.service';
+import { PmuData } from '../../../core/models/pmu-data.model';
 import ForceGraph3D from '3d-force-graph';
 import * as THREE from 'three';
 
@@ -328,7 +329,11 @@ export class Network3DComponent implements OnInit, OnDestroy {
 
   private initializeGraph(): void {
     requestAnimationFrame(() => {
-      const ForceGraph3D = (window as any).ForceGraph3D || ForceGraph3DLib;
+      const ForceGraph3D = (window as any).ForceGraph3D;
+      if (!ForceGraph3D) {
+        console.error('ForceGraph3D not loaded');
+        return;
+      }
       this.graph = new ForceGraph3D()(this.graphContainer.nativeElement)
         .graphData(this.graphData)
         .backgroundColor('#0a0a0a')
@@ -460,7 +465,7 @@ export class Network3DComponent implements OnInit, OnDestroy {
 
     // Animate particles along the link
     const animate = () => {
-      const positions = particles.attributes.position.array as Float32Array;
+      const positions = particles.getAttribute('position').array as Float32Array;
       const time = Date.now() * 0.001;
 
       for (let i = 0; i < particleCount; i++) {
@@ -473,7 +478,7 @@ export class Network3DComponent implements OnInit, OnDestroy {
         positions[i * 3 + 2] = (link.source.z || 0) + ((link.target.z || 0) - (link.source.z || 0)) * t;
       }
 
-      particles.attributes.position.needsUpdate = true;
+      particles.getAttribute('position').needsUpdate = true;
       requestAnimationFrame(animate);
     };
 

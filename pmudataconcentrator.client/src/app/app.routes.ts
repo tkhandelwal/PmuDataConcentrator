@@ -43,17 +43,17 @@ export const routes: Routes = [
     children: [
       {
         path: 'frequency-analysis',
-        loadComponent: () => import('./features/analytics/frequency-analysis/frequency-analysis.component').then(m => m.FrequencyAnalysisComponent),
+        loadComponent: () => import('./features/analytics/frequency-analysis.component').then(m => m.FrequencyAnalysisComponent),
         data: { breadcrumb: 'Frequency Analysis' }
       },
       {
         path: 'voltage-stability',
-        loadComponent: () => import('./features/analytics/voltage-stability/voltage-stability.component').then(m => m.VoltageStabilityComponent),
+        loadComponent: () => import('./features/analytics/voltage-stability.component').then(m => m.VoltageStabilityComponent),
         data: { breadcrumb: 'Voltage Stability' }
       },
       {
         path: 'oscillation-detection',
-        loadComponent: () => import('./features/analytics/oscillation-detection/oscillation-detection.component').then(m => m.OscillationDetectionComponent),
+        loadComponent: () => import('./features/analytics/oscillation-detection.component').then(m => m.OscillationDetectionComponent),
         data: { breadcrumb: 'Oscillation Detection' }
       },
       {

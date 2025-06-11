@@ -278,3 +278,10 @@ export class ModalAnalysisComponent implements OnInit {
       this.eigenChart.update();
     }
   }
+
+  getDampingColor(damping: number): string {
+    if (damping > 10) return '#4caf50';
+    if (damping > 5) return '#ff9800';
+    return '#f44336';
+  }
+}

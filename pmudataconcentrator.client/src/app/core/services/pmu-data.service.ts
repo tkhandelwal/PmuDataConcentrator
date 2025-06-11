@@ -18,6 +18,9 @@ interface SystemState {
   maxAngleSpread: number;
   systemInertia: number;
   damping: number;
+  minFrequency: number;  // Add this
+  maxFrequency: number;  // Add this
+
 }
 
 interface VoltageStabilityMetrics {
@@ -53,7 +56,9 @@ export class PmuDataService {
     avgVoltage: 1.0,
     maxAngleSpread: 0,
     systemInertia: 5.0,
-    damping: 1.0
+    damping: 1.0,
+    minFrequency: 60.0,  // Add this
+    maxFrequency: 60.0   // Add this
   });
   
   private voltageStabilitySubject = new BehaviorSubject<VoltageStabilityMetrics>({
@@ -385,6 +390,8 @@ export class PmuDataService {
     // Calculate average frequency
     const frequencies = pmuList.map(pmu => pmu.frequency);
     const avgFrequency = frequencies.reduce((sum, f) => sum + f, 0) / frequencies.length;
+    const minFrequency = Math.min(...frequencies);  // Add this
+    const maxFrequency = Math.max(...frequencies);  // Add this / frequencies.length;
     
     // Calculate average voltage
     let voltageSum = 0;
@@ -421,8 +428,11 @@ export class PmuDataService {
       avgVoltage,
       maxAngleSpread,
       systemInertia: this.calculateSystemInertia(pmuList),
-      damping: this.calculateSystemDamping(pmuList)
+      damping: this.calculateSystemDamping(pmuList),
+      minFrequency,  // Add this
+      maxFrequency   // Add this
     });
+  
     
     // Calculate voltage stability metrics
     this.calculateVoltageStability();
@@ -614,6 +624,10 @@ export class PmuDataService {
 
   getVoltageStability(): Observable<VoltageStabilityMetrics> {
     return this.voltageStabilitySubject.asObservable();
+  }
+
+  getPmuDataObservable(): Observable<PmuData[]> {
+    return new BehaviorSubject(this.pmuDataList()).asObservable();
   }
 
   getLatestData(): Observable<PmuData[]> {

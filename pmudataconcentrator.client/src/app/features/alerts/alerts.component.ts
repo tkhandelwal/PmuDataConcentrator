@@ -33,10 +33,10 @@ import { MatChipsModule } from '@angular/material/chips';
         <mat-card-content>
           <div class="alert-filters">
             <mat-chip-set>
-              <mat-chip [selected]="filter === 'all'" (click)="setFilter('all')">All</mat-chip>
-              <mat-chip [selected]="filter === 'critical'" (click)="setFilter('critical')">Critical</mat-chip>
-              <mat-chip [selected]="filter === 'warning'" (click)="setFilter('warning')">Warning</mat-chip>
-              <mat-chip [selected]="filter === 'info'" (click)="setFilter('info')">Info</mat-chip>
+              <mat-chip (click)="setFilter('all')" [class.mat-chip-selected]="filter === 'all'">All</mat-chip>
+              <mat-chip (click)="setFilter('critical')" [class.mat-chip-selected]="filter === 'critical'">Critical</mat-chip>
+              <mat-chip (click)="setFilter('warning')" [class.mat-chip-selected]="filter === 'warning'">Warning</mat-chip>
+              <mat-chip (click)="setFilter('info')" [class.mat-chip-selected]="filter === 'info'">Info</mat-chip>
             </mat-chip-set>
           </div>
           
@@ -79,6 +79,11 @@ import { MatChipsModule } from '@angular/material/chips';
     
     .alert-filters {
       margin-bottom: 20px;
+    }
+    
+    .mat-chip-selected {
+      background-color: #00d4ff !important;
+      color: #000 !important;
     }
     
     .alerts-list {
