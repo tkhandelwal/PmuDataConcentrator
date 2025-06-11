@@ -257,7 +257,8 @@ export class GlobeViewComponent implements OnInit, OnDestroy {
 
   private initializeGlobe(): void {
     requestAnimationFrame(() => {
-      this.globe = new Globe(this.globeContainer.nativeElement)
+      // Globe is a factory function, not a constructor
+      this.globe = Globe(this.globeContainer.nativeElement)
         .globeImageUrl('//unpkg.com/three-globe/example/img/earth-night.jpg')
         .bumpImageUrl('//unpkg.com/three-globe/example/img/earth-topology.png')
         .backgroundImageUrl('//unpkg.com/three-globe/example/img/night-sky.png')

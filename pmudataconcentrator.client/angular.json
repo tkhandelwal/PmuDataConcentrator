@@ -38,9 +38,16 @@
             ],
             "styles": [
               "@angular/material/prebuilt-themes/rose-red.css",
+              "node_modules/leaflet/dist/leaflet.css",
+              "node_modules/leaflet.markercluster/dist/MarkerCluster.css",
+              "node_modules/leaflet.markercluster/dist/MarkerCluster.Default.css",
               "src/styles.scss"
             ],
-            "scripts": []
+            "scripts": [
+              "node_modules/leaflet/dist/leaflet.js",
+              "node_modules/leaflet.markercluster/dist/leaflet.markercluster.js",
+              "node_modules/leaflet.heat/dist/leaflet-heat.js"
+            ]
           },
           "configurations": {
             "production": {

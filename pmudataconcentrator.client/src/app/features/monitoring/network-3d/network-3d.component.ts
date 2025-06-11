@@ -10,7 +10,9 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Subject, takeUntil } from 'rxjs';
 import { PmuDataService } from '../../../core/services/pmu-data.service';
 import { PmuData } from '../../../core/models/pmu-data.model';
+// Import ForceGraph3D as default
 import ForceGraph3D from '3d-force-graph';
+// Import THREE namespace
 import * as THREE from 'three';
 
 @Component({
@@ -329,12 +331,8 @@ export class Network3DComponent implements OnInit, OnDestroy {
 
   private initializeGraph(): void {
     requestAnimationFrame(() => {
-      const ForceGraph3D = (window as any).ForceGraph3D;
-      if (!ForceGraph3D) {
-        console.error('ForceGraph3D not loaded');
-        return;
-      }
-      this.graph = new ForceGraph3D()(this.graphContainer.nativeElement)
+      // Initialize the 3D force graph
+      this.graph = ForceGraph3D()(this.graphContainer.nativeElement)
         .graphData(this.graphData)
         .backgroundColor('#0a0a0a')
         .nodeThreeObject((node: any) => this.createNodeObject(node))
@@ -345,13 +343,17 @@ export class Network3DComponent implements OnInit, OnDestroy {
         .linkDirectionalArrowLength(3.5)
         .linkDirectionalArrowRelPos(1)
         .onNodeClick((node: any) => this.onNodeClick(node))
-        .onLinkClick((link: any) => this.onLinkClick(link))
-        .d3Force('charge')!.strength(-300)
-        .d3Force('link')!.distance(100)
-        .numDimensions(3)
-        .enableNodeDrag(true)
-        .enableNavigationControls(true)
-        .showNavInfo(false);
+        .onLinkClick((link: any) => this.onLinkClick(link));
+
+      // Configure forces
+      this.graph.d3Force('charge').strength(-300);
+      this.graph.d3Force('link').distance(100);
+
+      // Set dimensions
+      this.graph.numDimensions(3);
+      this.graph.enableNodeDrag(true);
+      this.graph.enableNavigationControls(true);
+      this.graph.showNavInfo(false);
 
       // Set initial camera position
       this.graph.cameraPosition({ x: 300, y: 300, z: 300 });
@@ -363,12 +365,12 @@ export class Network3DComponent implements OnInit, OnDestroy {
     });
   }
 
-  private createNodeObject(node: any): THREE.Object3D {
+  private createNodeObject(node: any): any {
     const group = new THREE.Group();
 
     // Different geometries for different node types
-    let geometry: THREE.BufferGeometry;
-    let material: THREE.Material;
+    let geometry: any;
+    let material: any;
 
     switch (node.type) {
       case 'generator':
@@ -435,7 +437,7 @@ export class Network3DComponent implements OnInit, OnDestroy {
     return group;
   }
 
-  private createPowerFlowObject(link: any): THREE.Object3D | null {
+  private createPowerFlowObject(link: any): any {
     if (!this.showPowerFlow || !link.source || !link.target) return null;
 
     const group = new THREE.Group();
@@ -575,34 +577,44 @@ export class Network3DComponent implements OnInit, OnDestroy {
   }
 
   async enterVRMode(): Promise<void> {
-    // Dynamically import VR module
-    const { default: ForceGraphVR } = await import('3d-force-graph-vr');
+    try {
+      // Dynamically import VR module
+      const ForceGraphVR = (await import('3d-force-graph-vr')).default;
 
-    // Create VR graph
-    const vrGraph = ForceGraphVR()(this.graphContainer.nativeElement)
-      .graphData(this.graphData)
-      .nodeThreeObject((node: any) => this.createNodeObject(node))
-      .linkColor((link: any) => this.getLinkColor(link));
+      // Create VR graph
+      const vrGraph = ForceGraphVR()(this.graphContainer.nativeElement)
+        .graphData(this.graphData)
+        .nodeThreeObject((node: any) => this.createNodeObject(node))
+        .linkColor((link: any) => this.getLinkColor(link));
 
-    // Enter VR
-    if ('xr' in navigator) {
-      const xr = (navigator as any).xr;
-      const session = await xr.requestSession('immersive-vr');
-      console.log('VR session started:', session);
+      // Enter VR
+      if ('xr' in navigator) {
+        const xr = (navigator as any).xr;
+        const session = await xr.requestSession('immersive-vr');
+        console.log('VR session started:', session);
+      }
+    } catch (error) {
+      console.error('Failed to enter VR mode:', error);
     }
   }
 
+
   async enterARMode(): Promise<void> {
-    // Dynamically import AR module
-    const { default: ForceGraphAR } = await import('3d-force-graph-ar');
+    try {
+      // Dynamically import AR module
+      const ForceGraphAR = (await import('3d-force-graph-ar')).default;
 
-    // Create AR graph
-    const arGraph = ForceGraphAR()(this.graphContainer.nativeElement)
-      .graphData(this.graphData)
-      .nodeThreeObject((node: any) => this.createNodeObject(node))
-      .arScale(50);
+      // Create AR graph
+      const arGraph = ForceGraphAR()(this.graphContainer.nativeElement)
+        .graphData(this.graphData)
+        .nodeThreeObject((node: any) => this.createNodeObject(node));
+      // Use bracket notation to access arScale
+      arGraph['arScale'](50);
 
-    console.log('AR mode initialized');
+      console.log('AR mode initialized');
+    } catch (error) {
+      console.error('Failed to enter AR mode:', error);
+    }
   }
 
   viewNodeDetails(): void {

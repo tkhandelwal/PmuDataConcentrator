@@ -26,12 +26,20 @@
     ],
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": [ "node", "jasmine" ],
+    "typeRoots": [
+      "node_modules/@types",
+      "src/app/types"
+        ],
     "paths": {
       "@app/*": [ "src/app/*" ],
       "@core/*": [ "src/app/core/*" ],
       "@features/*": [ "src/app/features/*" ],
       "@shared/*": [ "src/app/shared/*" ],
-      "@assets/*": [ "src/assets/*" ]
+      "@assets/*": [ "src/assets/*" ],
+      "three": [ "node_modules/three/build/three.module.js" ],
+      "three/*": [ "node_modules/three/*" ]
     }
   },
   "angularCompilerOptions": {
