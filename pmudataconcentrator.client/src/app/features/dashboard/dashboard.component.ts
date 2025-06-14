@@ -503,19 +503,19 @@ interface Alert {
               <div class="pmu-summary">
                 <span class="summary-item good">
                   <mat-icon>check_circle</mat-icon>
-                  {{ getHealthyPmuCount() }}
+                  {{ healthyPmuCount() }}
                 </span>
                 <span class="summary-item warning">
                   <mat-icon>warning</mat-icon>
-                  {{ getWarningPmuCount() }}
+                  {{ warningPmuCount() }}
                 </span>
                 <span class="summary-item critical">
                   <mat-icon>error</mat-icon>
-                  {{ getCriticalPmuCount() }}
+                  {{ criticalPmuCount() }}
                 </span>
                 <span class="summary-item offline">
                   <mat-icon>cancel</mat-icon>
-                  {{ getOfflinePmuCount() }}
+                  {{ offlinePmuCount() }}
                 </span>
               </div>
             </mat-card-title>
@@ -1932,6 +1932,28 @@ export class DashboardComponent implements OnInit, OnDestroy {
       alerts.filter(a => a.id !== alertId)
     );
   }
+
+  healthyPmuCount = computed(() =>
+    this.pmuDataList().filter(pmu =>
+      !this.hasAlert(pmu) && !this.isOffline(pmu)
+    ).length
+  );
+
+  warningPmuCount = computed(() =>
+    this.pmuDataList().filter(pmu =>
+      this.hasWarning(pmu) && !this.isOffline(pmu)
+    ).length
+  );
+
+  criticalPmuCount = computed(() =>
+    this.pmuDataList().filter(pmu =>
+      this.hasCritical(pmu) && !this.isOffline(pmu)
+    ).length
+  );
+
+  offlinePmuCount = computed(() =>
+    this.totalPmuCount() - this.activePmuCount()
+  );
 
   addAlert(alert: Alert): void {
     this.activeAlerts.update(alerts => [...alerts, alert]);

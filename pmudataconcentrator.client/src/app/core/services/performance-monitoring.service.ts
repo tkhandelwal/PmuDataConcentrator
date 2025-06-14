@@ -169,12 +169,16 @@ export class PerformanceMonitoringService {
     // Clear caches and unused objects
     console.log('Triggering garbage collection...');
 
-    // Clear image caches
+    // Clear image caches safely
     const canvases = document.querySelectorAll('canvas');
     canvases.forEach(canvas => {
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      try {
+        const ctx = canvas.getContext('2d');
+        if (ctx && canvas.width > 0 && canvas.height > 0) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+      } catch (error) {
+        console.warn('Failed to clear canvas:', error);
       }
     });
 

@@ -73,7 +73,9 @@ export class PmuDataService {
   
   private pmuDataMap = signal<Map<number, PmuData>>(new Map());
   public pmuDataList = computed(() => Array.from(this.pmuDataMap().values()));
-  
+
+
+
   // Power flow data for advanced calculations
   private powerFlowData = new Map<number, PowerFlowData>();
   

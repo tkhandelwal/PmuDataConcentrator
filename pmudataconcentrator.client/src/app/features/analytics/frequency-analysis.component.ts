@@ -577,6 +577,8 @@ export class FrequencyAnalysisComponent implements OnInit, AfterViewInit, OnDest
   
   // Compliance
   compliancePercentage = 100;
+    vsiGaugeChart: any;
+    currentVSI: any;
   
   constructor(private pmuDataService: PmuDataService) {}
   
@@ -1038,10 +1040,19 @@ export class FrequencyAnalysisComponent implements OnInit, AfterViewInit, OnDest
   }
   
   private updateCharts(): void {
-    this.updateFrequencyChart();
-    this.updateRocofChart();
-    this.updateDistributionChart();
+    // Update VSI gauge
+    if (this.vsiGaugeChart) {
+      this.vsiGaugeChart.data.datasets[0].data = [this.currentVSI, 1 - this.currentVSI];
+      // Fix the backgroundColor assignment with proper typing
+      const backgroundColor = this.getGaugeColor(this.currentVSI);
+      const dataset = this.vsiGaugeChart.data.datasets[0];
+      dataset.backgroundColor = [backgroundColor, 'rgba(255, 255, 255, 0.05)'];
+      this.vsiGaugeChart.update('none');
+    }
   }
+    getGaugeColor(currentVSI: any) {
+        throw new Error('Method not implemented.');
+    }
   
   private updateFrequencyChart(): void {
     if (!this.frequencyChart) return;
